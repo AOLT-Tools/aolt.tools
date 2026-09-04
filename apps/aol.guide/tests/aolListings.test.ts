@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAolApiSearchUrl,
-  normalizeAolListing
+  normalizeAolListing,
+  sortListingsByDistance
 } from '../lib/sources/aolListings.js';
 import { sampleAolCourse } from './helpers.js';
 
@@ -58,5 +59,24 @@ describe('Art of Living live listings', () => {
       'https://www.artofliving.org/in-en/program/1050180'
     );
     expect(listing?.schedule).toContain('2026-09-04 to 2026-09-06');
+  });
+
+  it('sorts listings by distance from the search location', () => {
+    const far = normalizeAolListing(sampleAolCourse({ sao_id: 1, dist: 18000, title: 'Far' }));
+    const near = normalizeAolListing(sampleAolCourse({ sao_id: 2, dist: 3000, title: 'Near' }));
+    const unknown = normalizeAolListing(
+      sampleAolCourse({
+        sao_id: 3,
+        title: 'Unknown',
+        is_online_event: 1,
+        dist: undefined
+      })
+    );
+    const mid = normalizeAolListing(sampleAolCourse({ sao_id: 4, dist: 9000, title: 'Mid' }));
+    expect(
+      sortListingsByDistance([far, unknown, mid, near].filter((item) => item != null)).map(
+        (item) => item.title
+      )
+    ).toEqual(['Near', 'Mid', 'Far', 'Unknown']);
   });
 });

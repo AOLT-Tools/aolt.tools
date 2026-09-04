@@ -85,9 +85,11 @@ export async function fetchAolCourseListings(
     };
     const courses = Array.isArray(payload.courses) ? payload.courses : [];
     return {
-      listings: courses
-        .map(normalizeAolListing)
-        .filter((listing): listing is OfficialCourseListing => listing != null),
+      listings: sortListingsByDistance(
+        courses
+          .map(normalizeAolListing)
+          .filter((listing): listing is OfficialCourseListing => listing != null)
+      ),
       total: Number(payload.total) || courses.length
     };
   } finally {
@@ -145,6 +147,23 @@ export function normalizeAolListing(raw: unknown): OfficialCourseListing | null 
     registerUrl,
     detailUrl
   };
+}
+
+export function sortListingsByDistance(
+  listings: readonly OfficialCourseListing[]
+): OfficialCourseListing[] {
+  return [...listings].sort((left, right) => {
+    const leftKnown = isFiniteDistance(left.distanceKm);
+    const rightKnown = isFiniteDistance(right.distanceKm);
+    if (leftKnown && rightKnown) return left.distanceKm - right.distanceKm;
+    if (leftKnown) return -1;
+    if (rightKnown) return 1;
+    return 0;
+  });
+}
+
+function isFiniteDistance(value: number | null): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function readRecord(value: unknown): Record<string, unknown> | null {
