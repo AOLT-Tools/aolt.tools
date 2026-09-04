@@ -1,0 +1,1448 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Seva Hub - Programs, weekly activities, meditation, community and volunteering."
+    />
+    <meta name="theme-color" content="#fffaf1" />
+    <meta property="og:title" content="Seva Hub" />
+    <meta
+      property="og:description"
+      content="Programs, weekly activities, meditation and community."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/hero-main.webp" />
+    <title>Seva Hub</title>
+    <link rel="icon" type="image/png" href="/assets/seva-hub-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/seva-hub-logo.png" />
+    <script type="module" src="./publicPage.ts"></script>
+
+    <style>
+      :root {
+        --ink: #10131a;
+        --muted: #61656d;
+        --cream: #fffaf1;
+        --paper: #fffdf8;
+        --line: rgba(16, 19, 26, 0.09);
+        --green: #24b95b;
+        --gold: #f0b844;
+        --shadow: 0 14px 40px rgba(32, 29, 22, 0.1);
+        --soft-shadow: 0 8px 24px rgba(32, 29, 22, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #eee9df;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button {
+        font: inherit;
+      }
+      img {
+        display: block;
+        max-width: 100%;
+      }
+      .svg-icon {
+        width: 1.25em;
+        height: 1.25em;
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.9;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .svg-icon .fill-icon {
+        fill: currentColor;
+        stroke: none;
+      }
+      .action-icon .svg-icon {
+        width: 24px;
+        height: 24px;
+      }
+      .journey-icon .svg-icon {
+        width: 29px;
+        height: 29px;
+      }
+      .nav-icon .svg-icon {
+        width: 24px;
+        height: 24px;
+      }
+
+      /* Mobile-first page. On wide screens it is intentionally shown as a centered mobile canvas. */
+      .app-shell {
+        width: min(100%, 820px);
+        min-height: 100vh;
+        margin: 0 auto;
+        background: var(--paper);
+        box-shadow: 0 0 50px rgba(42, 36, 29, 0.08);
+        padding-bottom: 94px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 70;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        min-height: 78px;
+        padding: 12px 20px;
+        padding-top: max(12px, env(safe-area-inset-top));
+        background: rgba(255, 253, 248, 0.94);
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        backdrop-filter: blur(16px);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 0;
+      }
+      .brand img {
+        width: 52px;
+        height: 52px;
+        object-fit: contain;
+        border-radius: 13px;
+        background: white;
+      }
+      .brand-title {
+        font-size: 1.08rem;
+        font-weight: 850;
+        letter-spacing: -0.025em;
+        line-height: 1.08;
+      }
+      .brand-sub {
+        margin-top: 3px;
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .menu-btn {
+        width: 46px;
+        height: 46px;
+        border: 0;
+        background: transparent;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: var(--ink);
+      }
+      .menu-lines,
+      .menu-lines:before,
+      .menu-lines:after {
+        display: block;
+        width: 28px;
+        height: 3px;
+        border-radius: 9px;
+        background: currentColor;
+        content: '';
+      }
+      .menu-lines {
+        position: relative;
+      }
+      .menu-lines:before {
+        position: absolute;
+        top: -9px;
+      }
+      .menu-lines:after {
+        position: absolute;
+        top: 9px;
+      }
+
+      .menu-sheet {
+        position: fixed;
+        z-index: 90;
+        inset: 0;
+        display: none;
+        background: rgba(15, 16, 18, 0.38);
+        backdrop-filter: blur(5px);
+      }
+      .menu-sheet.open {
+        display: block;
+      }
+      .menu-panel {
+        width: min(86vw, 390px);
+        height: 100%;
+        margin-left: auto;
+        background: var(--paper);
+        padding: calc(22px + env(safe-area-inset-top)) 22px 28px;
+        box-shadow: -20px 0 60px rgba(0, 0, 0, 0.15);
+      }
+      .menu-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+      }
+      .menu-head strong {
+        font-size: 1.15rem;
+      }
+      .close-btn {
+        border: 0;
+        background: #f3eee5;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        font-size: 1.6rem;
+      }
+      .menu-link {
+        display: flex;
+        justify-content: space-between;
+        padding: 17px 2px;
+        border-bottom: 1px solid var(--line);
+        font-weight: 800;
+      }
+      .menu-call {
+        margin-top: 18px;
+        display: flex;
+        justify-content: center;
+        padding: 15px;
+        border-radius: 17px;
+        background: var(--ink);
+        color: white;
+        font-weight: 850;
+      }
+
+      .hero {
+        position: relative;
+        min-height: 575px;
+        overflow: hidden;
+        background: #f7efdf;
+        isolation: isolate;
+      }
+      .hero-picture {
+        position: absolute;
+        inset: 0;
+        z-index: -3;
+        overflow: hidden;
+      }
+      .hero-bg {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 52% center;
+        transform: scale(1.015);
+      }
+      .hero:before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 250, 240, 0.98) 0%,
+          rgba(255, 250, 240, 0.88) 31%,
+          rgba(255, 250, 240, 0.17) 57%,
+          rgba(255, 250, 240, 0) 78%
+        );
+      }
+      .hero:after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 110px;
+        z-index: -1;
+        background: linear-gradient(0deg, var(--paper), rgba(255, 253, 248, 0));
+      }
+      .hero-copy {
+        width: 54%;
+        padding: 48px 0 128px 30px;
+      }
+      .hero h1 {
+        margin: 0;
+        max-width: 330px;
+        font-size: clamp(2.72rem, 10.7vw, 4.35rem);
+        line-height: 0.96;
+        letter-spacing: -0.055em;
+        font-weight: 900;
+      }
+      .hero p {
+        max-width: 285px;
+        margin: 22px 0 0;
+        font-size: 1.08rem;
+        line-height: 1.45;
+        color: #282a2e;
+        font-weight: 510;
+      }
+      .hero-benefits {
+        position: absolute;
+        left: 28px;
+        bottom: 224px;
+        width: min(390px, 52%);
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(255, 255, 255, 0.82);
+        box-shadow: 0 5px 18px rgba(32, 29, 22, 0.06);
+        backdrop-filter: blur(9px);
+        -webkit-backdrop-filter: blur(9px);
+      }
+      .hero-benefit {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.67rem;
+        font-weight: 820;
+        white-space: nowrap;
+        color: #25282d;
+      }
+      .hero-benefit + .hero-benefit:before {
+        content: '•';
+        margin: 0 3px;
+        color: #b78b35;
+        font-size: 0.72rem;
+      }
+      .hero-benefit .svg-icon {
+        width: 14px;
+        height: 14px;
+        stroke-width: 2;
+      }
+      .hero-actions {
+        position: absolute;
+        left: 28px;
+        bottom: 54px;
+        width: min(390px, 52%);
+        display: grid;
+        gap: 12px;
+        z-index: 2;
+      }
+      .hero-action {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 78px;
+        padding: 14px 18px;
+        border-radius: 17px;
+        box-shadow: var(--soft-shadow);
+      }
+      .hero-action.primary {
+        background: #12151b;
+        color: white;
+      }
+      .hero-action.secondary {
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid rgba(0, 0, 0, 0.05);
+      }
+      .action-icon {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.11);
+        font-size: 1.35rem;
+        color: currentColor;
+      }
+      .secondary .action-icon {
+        background: #f2f2f2;
+      }
+      .action-title {
+        font-size: 1rem;
+        font-weight: 850;
+        line-height: 1.1;
+      }
+      .action-sub {
+        font-size: 0.76rem;
+        opacity: 0.76;
+        margin-top: 4px;
+      }
+
+      .content {
+        padding: 0 18px;
+      }
+      .section-title {
+        margin: 34px 0 18px;
+        text-align: center;
+        font-size: 1.45rem;
+        letter-spacing: -0.035em;
+        font-weight: 900;
+      }
+      .journeys {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .journey {
+        min-height: 180px;
+        border-radius: 18px;
+        padding: 14px 9px 13px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .journey:nth-child(1) {
+        background: #edf8ef;
+      }
+      .journey:nth-child(2) {
+        background: #f6eef8;
+      }
+      .journey:nth-child(3) {
+        background: #fff3e9;
+      }
+      .journey:nth-child(4) {
+        background: #edf5fb;
+      }
+      .journey-icon {
+        width: 56px;
+        height: 56px;
+        margin-top: -28px;
+        margin-bottom: 12px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: white;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+        font-size: 1.55rem;
+      }
+      .journey:nth-child(1) .journey-icon {
+        color: #159b43;
+      }
+      .journey:nth-child(2) .journey-icon {
+        color: #a32891;
+      }
+      .journey:nth-child(3) .journey-icon {
+        color: #ef7808;
+      }
+      .journey:nth-child(4) .journey-icon {
+        color: #1266ad;
+      }
+      .journey strong {
+        font-size: 0.86rem;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+      }
+      .journey small {
+        margin-top: 10px;
+        font-size: 0.68rem;
+        line-height: 1.35;
+        color: #35373c;
+      }
+
+      .program-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 32px;
+        margin-bottom: 14px;
+      }
+      .program-head h2 {
+        font-size: 1.48rem;
+        letter-spacing: -0.04em;
+        margin: 0;
+      }
+      .program-head a {
+        font-size: 0.77rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .program-area {
+        position: relative;
+      }
+      .program-slider {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 42%;
+        gap: 12px;
+        overflow: auto;
+        scroll-snap-type: x mandatory;
+        padding: 2px 1px 18px;
+        scrollbar-width: none;
+      }
+      .program-slider::-webkit-scrollbar {
+        display: none;
+      }
+      .program-card {
+        scroll-snap-align: start;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 6px 18px rgba(25, 20, 14, 0.07);
+      }
+      .program-card img {
+        width: 100%;
+        aspect-ratio: 1.6/1;
+        object-fit: cover;
+        object-position: center;
+        background: #f3eee6;
+      }
+      .program-card:nth-child(1) img {
+        object-position: 50% 42%;
+      }
+      .program-card:nth-child(2) img {
+        object-position: 50% 45%;
+      }
+      .program-card:nth-child(3) img {
+        object-position: 50% 48%;
+      }
+      .program-body {
+        padding: 11px 11px 13px;
+      }
+      .program-body strong {
+        display: block;
+        font-size: 0.84rem;
+        line-height: 1.2;
+        min-height: 2.05em;
+      }
+      .program-cta {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 0;
+        background: none;
+        border-radius: 0;
+        color: inherit;
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .slide-btn {
+        position: absolute;
+        top: 42%;
+        z-index: 2;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: white;
+        box-shadow: 0 5px 18px rgba(0, 0, 0, 0.12);
+        display: grid;
+        place-items: center;
+        font-size: 1.55rem;
+        cursor: pointer;
+      }
+      .slide-btn.prev {
+        left: -10px;
+      }
+      .slide-btn.next {
+        right: -10px;
+      }
+
+      .schedule-section {
+        margin: 34px -18px 0;
+        padding: 30px 18px 32px;
+        background: #41473b;
+        color: #f7f2eb;
+      }
+      .schedule-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 18px;
+      }
+      .schedule-head h2 {
+        margin: 0;
+        font-size: 1.55rem;
+        letter-spacing: -0.04em;
+      }
+      .schedule-head p {
+        margin: 7px 0 0;
+        max-width: 520px;
+        color: #cbc9c3;
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+      .schedule-ask {
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        border-radius: 999px;
+        padding: 10px 13px;
+        font-size: 0.72rem;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+      .schedule-tabs {
+        display: flex;
+        gap: 7px;
+        overflow: auto;
+        padding: 20px 0 15px;
+        scrollbar-width: none;
+      }
+      .schedule-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      .schedule-tab {
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: transparent;
+        color: white;
+        border-radius: 999px;
+        padding: 9px 12px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .schedule-tab.active {
+        background: #f1e5d7;
+        color: #25221f;
+        border-color: #f1e5d7;
+      }
+      .schedule-list {
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .schedule-item {
+        display: grid;
+        grid-template-columns: 82px 1fr auto;
+        gap: 16px;
+        align-items: center;
+        padding: 18px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .schedule-when {
+        font-size: 0.9rem;
+        font-weight: 850;
+      }
+      .schedule-item h3 {
+        margin: 0 0 4px;
+        font-size: 0.9rem;
+      }
+      .schedule-item p {
+        margin: 0;
+        color: #cbc9c3;
+        font-size: 0.7rem;
+        line-height: 1.4;
+      }
+      .schedule-badge {
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 999px;
+        padding: 7px 9px;
+        font-size: 0.62rem;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+      .community-sections {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .community-card {
+        border-radius: 20px;
+        padding: 20px;
+        background: #f7f1e8;
+      }
+      .contribute-card {
+        grid-column: 1/-1;
+      }
+      .community-card h3 {
+        margin: 0 0 7px;
+        font-size: 1.05rem;
+      }
+      .community-card p {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 0.77rem;
+        line-height: 1.45;
+      }
+      .community-links {
+        display: grid;
+        gap: 7px;
+        font-size: 0.73rem;
+        font-weight: 800;
+      }
+      .community-links a {
+        padding-top: 7px;
+        border-top: 1px solid var(--line);
+      }
+
+      .mini-sections {
+        display: grid;
+        gap: 12px;
+        padding-bottom: 18px;
+      }
+      .mini {
+        border-radius: 20px;
+        padding: 19px;
+        background: #f7f1e8;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      .mini h3 {
+        margin: 0 0 4px;
+        font-size: 1.05rem;
+      }
+      .mini p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+      .mini span {
+        font-size: 1.4rem;
+      }
+
+      .bottom-nav {
+        position: fixed;
+        z-index: 60;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(100%, 820px);
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        min-height: 76px;
+        padding: 8px 7px max(8px, env(safe-area-inset-bottom));
+        background: rgba(255, 255, 255, 0.96);
+        border-top: 1px solid var(--line);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.06);
+      }
+      .nav-item {
+        display: grid;
+        place-items: center;
+        align-content: center;
+        gap: 4px;
+        border: 0;
+        background: transparent;
+        color: #6d7076;
+        font-size: 0.67rem;
+      }
+      .nav-icon {
+        font-size: 1.37rem;
+        line-height: 1;
+      }
+      .nav-item.active {
+        color: #11151b;
+        font-weight: 850;
+      }
+
+      @media (min-width: 768px) {
+        .hero-copy {
+          width: 60%;
+          padding: 52px 0 0 36px;
+        }
+        .hero h1 {
+          max-width: 430px;
+          font-size: 4rem;
+        }
+        .hero p {
+          max-width: 335px;
+          margin-top: 20px;
+        }
+        .hero-benefits {
+          left: 36px;
+          bottom: 160px;
+          width: auto;
+          max-width: 390px;
+        }
+        .hero-actions {
+          left: 36px;
+          right: 36px;
+          bottom: 42px;
+          width: auto;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 620px) {
+        .topbar {
+          min-height: 70px;
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+        .brand img {
+          width: 44px;
+          height: 44px;
+        }
+        .brand-title {
+          font-size: 1rem;
+        }
+        .brand-sub {
+          font-size: 0.7rem;
+        }
+
+        .hero {
+          min-height: 455px;
+        }
+        .hero-picture .hero-bg {
+          object-fit: cover;
+          object-position: 24% 46%;
+          transform: none;
+        }
+        .hero:before {
+          background:
+            linear-gradient(
+              180deg,
+              rgba(255, 250, 240, 0) 0%,
+              rgba(255, 250, 240, 0) 54%,
+              rgba(255, 250, 240, 0.2) 74%,
+              rgba(255, 253, 248, 0.82) 100%
+            ),
+            linear-gradient(
+              90deg,
+              rgba(255, 250, 240, 0.97) 0%,
+              rgba(255, 250, 240, 0.9) 27%,
+              rgba(255, 250, 240, 0.42) 39%,
+              rgba(255, 250, 240, 0.06) 52%,
+              rgba(255, 250, 240, 0) 63%
+            );
+        }
+        .hero-copy {
+          width: 55%;
+          padding: 34px 0 0 20px;
+        }
+        .hero h1 {
+          font-size: clamp(2.15rem, 10.7vw, 2.95rem);
+        }
+        /* Center the supporting copy in the open vertical space below the headline. */
+        .hero p {
+          font-size: 0.88rem;
+          line-height: 1.4;
+          max-width: 195px;
+          margin-top: 64px;
+        }
+        /* Keep the three benefits on one compact line, above the actions and clear of the face. */
+        .hero-benefits {
+          left: 18px;
+          right: auto;
+          bottom: 142px;
+          width: max-content;
+          max-width: calc(100% - 36px);
+          margin: 0;
+          padding: 7px 11px;
+          gap: 5px;
+          flex-direction: row;
+          align-items: center;
+          justify-content: flex-start;
+          border-radius: 999px;
+        }
+        .hero-benefit {
+          font-size: 0.57rem;
+          gap: 4px;
+        }
+        .hero-benefit + .hero-benefit:before {
+          display: block;
+          margin: 0 2px;
+        }
+        .hero-benefit .svg-icon {
+          width: 12px;
+          height: 12px;
+          flex: 0 0 12px;
+        }
+        .hero-actions {
+          left: 18px;
+          right: auto;
+          bottom: 18px;
+          width: min(88%, 560px);
+          grid-template-columns: 1fr;
+          gap: 7px;
+        }
+        .hero-action {
+          min-height: 52px;
+          padding: 7px 13px;
+        }
+        .action-icon {
+          width: 36px;
+          height: 36px;
+          flex-basis: 36px;
+        }
+        .action-title {
+          font-size: 0.92rem;
+        }
+        .action-sub {
+          font-size: 0.69rem;
+        }
+
+        .content {
+          padding: 0 12px;
+        }
+
+        .section-title {
+          font-size: 1.28rem;
+          margin: 32px 0 34px;
+        }
+        .journeys {
+          gap: 7px;
+        }
+        .journey {
+          min-height: 158px;
+          padding: 12px 6px 9px;
+          border-radius: 14px;
+        }
+        .journey-icon {
+          width: 48px;
+          height: 48px;
+          margin-top: -24px;
+          font-size: 1.25rem;
+        }
+        .journey strong {
+          font-size: 0.72rem;
+        }
+        .journey small {
+          font-size: 0.6rem;
+          margin-top: 8px;
+        }
+
+        .program-head {
+          margin-top: 28px;
+        }
+        .program-head h2 {
+          font-size: 1.3rem;
+        }
+        .program-head a {
+          font-size: 0.68rem;
+        }
+        .program-slider {
+          grid-auto-columns: 44%;
+        }
+        .slide-btn {
+          width: 40px;
+          height: 40px;
+          font-size: 1.3rem;
+        }
+        .program-body {
+          padding: 9px 9px 11px;
+        }
+        .program-body strong {
+          font-size: 0.74rem;
+        }
+        .schedule-section {
+          margin-left: -12px;
+          margin-right: -12px;
+          padding: 27px 14px 28px;
+        }
+        .schedule-head {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .schedule-item {
+          grid-template-columns: 70px 1fr;
+          gap: 12px;
+        }
+        .schedule-badge {
+          grid-column: 2;
+          width: max-content;
+        }
+        .community-sections {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 390px) {
+        .hero-copy {
+          width: 58%;
+        }
+        .hero h1 {
+          font-size: 2.08rem;
+        }
+        .hero-benefits {
+          width: max-content;
+          max-width: calc(100% - 28px);
+          padding: 6px 8px;
+          gap: 3px;
+        }
+        .hero-benefit {
+          font-size: 0.5rem;
+          gap: 3px;
+        }
+        .hero-benefit + .hero-benefit:before {
+          display: block;
+          margin: 0 1px;
+        }
+        .hero-benefit .svg-icon {
+          width: 11px;
+          height: 11px;
+        }
+        .journey strong {
+          font-size: 0.66rem;
+        }
+        .journey small {
+          display: none;
+        }
+        .journey {
+          min-height: 126px;
+        }
+        .program-slider {
+          grid-auto-columns: 49%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        * {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app-shell" id="home" x-data="homepagePrograms">
+      <header class="topbar">
+        <a class="brand" href="#home" aria-label="Seva Hub home">
+          <img src="/assets/seva-hub-logo.png" alt="Seva Hub logo" />
+          <div>
+            <div class="brand-title">Seva Hub</div>
+            <div class="brand-sub">Local Community</div>
+          </div>
+        </a>
+
+        <button
+          class="menu-btn"
+          id="menuButton"
+          aria-label="Open menu"
+          aria-expanded="false"
+        >
+          <span class="menu-lines"></span>
+        </button>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <picture class="hero-picture">
+            <source media="(max-width: 620px)" srcset="assets/hero-main.webp" />
+            <img
+              class="hero-bg"
+              src="assets/hero-main.webp"
+              alt="Smiling participant at a vibrant community celebration"
+              fetchpriority="high"
+            />
+          </picture>
+          <div class="hero-copy">
+            <h1 id="hero-title">Come back<br />to yourself.</h1>
+            <p>Discover programs and community for a happier, healthier life.</p>
+          </div>
+
+          <div class="hero-benefits" aria-label="Breathe, meditate and connect">
+            <span class="hero-benefit"
+              ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 10c3 0 3-3 6-3s3 3 6 3 3-3 4-3M4 15c3 0 3-3 6-3s3 3 6 3 3-3 4-3"
+                /></svg
+              >Breathe</span
+            >
+            <span class="hero-benefit"
+              ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="6" r="2.3" />
+                <path
+                  d="M8.5 11.5 6 15l-3 1.5m12.5-5L18 15l3 1.5M8 12l4 3 4-3M5 21c1.8-2.2 4.1-3.3 7-3.3s5.2 1.1 7 3.3"
+                /></svg
+              >Meditate</span
+            >
+            <span class="hero-benefit"
+              ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 20s-7-4.3-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.7-7 10-7 10Z"
+                /></svg
+              >Connect</span
+            >
+          </div>
+
+          <div class="hero-actions">
+            <a class="hero-action primary" href="#programs">
+              <div class="action-icon">
+                <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6.5-1.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5ZM2.5 20v-1.5A5.5 5.5 0 0 1 8 13h2a5.5 5.5 0 0 1 5.5 5.5V20m0-6.4a5 5 0 0 1 6 4.9V20"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="action-title">Explore Programs</div>
+                <div class="action-sub">Find the right program for you</div>
+              </div>
+            </a>
+            <a class="hero-action secondary" href="#schedule">
+              <div class="action-icon">
+                <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M6 2v3m12-3v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Zm3 9h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div class="action-title">What’s On</div>
+                <div class="action-sub">View this week’s activities</div>
+              </div>
+            </a>
+          </div>
+        </section>
+
+        <div class="content">
+          <section aria-labelledby="looking-title">
+            <h2 class="section-title" id="looking-title">What are you looking for?</h2>
+            <div class="journeys">
+              <a class="journey" href="#schedule" data-schedule-target="free">
+                <div class="journey-icon">
+                  <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M4 10c3 0 3-3 6-3s3 3 6 3 3-3 4-3M4 15c3 0 3-3 6-3s3 3 6 3 3-3 4-3"
+                    />
+                    <circle cx="12" cy="4" r="1.5" />
+                  </svg>
+                </div>
+                <strong>Free Intro Session</strong>
+                <small>Open to all • Online & Offline</small>
+              </a>
+              <a class="journey" href="#programs">
+                <div class="journey-icon">
+                  <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="8" cy="8" r="3" />
+                    <circle cx="16.5" cy="9" r="2.5" />
+                    <path
+                      d="M3.5 20v-1.3A4.7 4.7 0 0 1 8.2 14h.3a4.7 4.7 0 0 1 4.7 4.7V20"
+                    />
+                    <path
+                      d="M13.2 15.3a4.1 4.1 0 0 1 3.5-2h.2a4.1 4.1 0 0 1 4.1 4.1V20"
+                    />
+                  </svg>
+                </div>
+                <strong>Programs for All Ages</strong>
+                <small>Children, Teens & Adults</small>
+              </a>
+              <a class="journey" href="#schedule" data-schedule-target="practice">
+                <div class="journey-icon">
+                  <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2.5" />
+                    <path
+                      d="M8.5 10.5 6 14l-3 1.5M15.5 10.5 18 14l3 1.5M8 11.5l4 3 4-3M4.5 20c1.8-2.2 4.2-3.2 7.5-3.2s5.7 1 7.5 3.2"
+                    />
+                  </svg>
+                </div>
+                <strong>Member Activities</strong>
+                <small>Follow-ups, Satsang & More</small>
+              </a>
+              <a class="journey" href="#contribute">
+                <div class="journey-icon">
+                  <svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M12 9.5c-2.3-3.2-6.5-1.6-6.5 1.6 0 2.6 3 4.7 6.5 7.4 3.5-2.7 6.5-4.8 6.5-7.4 0-3.2-4.2-4.8-6.5-1.6Z"
+                    />
+                    <path
+                      d="M3 13.5 1.8 16a2 2 0 0 0 .5 2.3L7 22m14-8.5 1.2 2.5a2 2 0 0 1-.5 2.3L17 22"
+                    />
+                  </svg>
+                </div>
+                <strong>Contribute</strong>
+                <small>Give time, skills or support</small>
+              </a>
+            </div>
+          </section>
+
+          <section id="programs" aria-labelledby="programs-title">
+            <div class="program-head">
+              <h2 id="programs-title">Programs We Offer</h2>
+              <a
+                href="https://www.artofliving.org/in-en/programs"
+                target="_blank"
+                rel="noopener noreferrer"
+                >View all programs&nbsp; →</a
+              >
+            </div>
+
+            <!-- This is the catalogue of programs offered at this location, not only programs currently running. -->
+            <div class="program-area">
+              <button
+                class="slide-btn prev"
+                id="prevProgram"
+                aria-label="Previous programs"
+              >
+                ‹
+              </button>
+              <div class="program-slider" id="programSlider">
+                <article class="program-card">
+                  <img
+                    src="assets/course-hp.webp"
+                    alt="Happiness Program"
+                    loading="lazy"
+                  />
+                  <div class="program-body">
+                    <strong>Happiness Program (Adults)</strong>
+                    <a
+                      class="program-cta"
+                      href="https://wa.me/918884560660?text=Hi%2C%20I%20would%20like%20to%20know%20more%20about%20the%20Happiness%20Program."
+                      :href="cta('HP').href"
+                      :target="cta('HP').external ? '_blank' : null"
+                      :rel="cta('HP').external ? 'noopener noreferrer' : null"
+                      x-text="cta('HP').label"
+                      >Know More</a
+                    >
+                  </div>
+                </article>
+
+                <article class="program-card">
+                  <img
+                    src="assets/course-ip.webp"
+                    alt="Intuition Program"
+                    loading="lazy"
+                  />
+                  <div class="program-body">
+                    <strong>Intuition Program (Kids & Teens)</strong>
+                    <a
+                      class="program-cta"
+                      href="https://wa.me/918884560660?text=Hi%2C%20I%20would%20like%20to%20know%20more%20about%20the%20Intuition%20Program."
+                      :href="cta('IP').href"
+                      :target="cta('IP').external ? '_blank' : null"
+                      :rel="cta('IP').external ? 'noopener noreferrer' : null"
+                      x-text="cta('IP').label"
+                      >Know More</a
+                    >
+                  </div>
+                </article>
+
+                <article class="program-card">
+                  <img
+                    src="assets/course-sahaj.webp"
+                    alt="Sahaj Samadhi Meditation"
+                    loading="lazy"
+                  />
+                  <div class="program-body">
+                    <strong>Sahaj Samadhi Meditation (Adults)</strong>
+                    <a
+                      class="program-cta"
+                      href="https://wa.me/918884560660?text=Hi%2C%20I%20would%20like%20to%20know%20more%20about%20the%20Sahaj%20Samadhi%20Meditation."
+                      :href="cta('Sahaj').href"
+                      :target="cta('Sahaj').external ? '_blank' : null"
+                      :rel="cta('Sahaj').external ? 'noopener noreferrer' : null"
+                      x-text="cta('Sahaj').label"
+                      >Know More</a
+                    >
+                  </div>
+                </article>
+              </div>
+              <button
+                class="slide-btn next"
+                id="nextProgram"
+                aria-label="Next programs"
+              >
+                ›
+              </button>
+            </div>
+          </section>
+
+          <section
+            class="schedule-section"
+            id="schedule"
+            aria-labelledby="schedule-title"
+          >
+            <div class="schedule-head">
+              <div>
+                <h2 id="schedule-title">Schedule</h2>
+                <p>
+                  Find free activities open to everyone, regular member practices and
+                  special community events.
+                </p>
+              </div>
+              <a
+                class="schedule-ask"
+                href="https://wa.me/918884560660"
+                :href="centerWhatsappHref()"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Ask for timings ↗</a
+              >
+            </div>
+
+            <div class="schedule-tabs" role="tablist" aria-label="Schedule categories">
+              <button class="schedule-tab active" type="button" data-filter="all">
+                This week
+              </button>
+              <button class="schedule-tab" type="button" data-filter="free">
+                Free & Open
+              </button>
+              <button class="schedule-tab" type="button" data-filter="practice">
+                Follow-ups
+              </button>
+              <button class="schedule-tab" type="button" data-filter="community">
+                Satsang
+              </button>
+              <button class="schedule-tab" type="button" data-filter="special">
+                Special Events
+              </button>
+            </div>
+
+            <div class="schedule-list">
+              <div class="schedule-item" data-category="free">
+                <div class="schedule-when">Upcoming</div>
+                <div>
+                  <h3>Free Intro Sessions</h3>
+                  <p>
+                    Online and offline introductions for anyone exploring the Art of
+                    Living.
+                  </p>
+                </div>
+                <span class="schedule-badge">Everyone welcome</span>
+              </div>
+              <div class="schedule-item" data-category="practice">
+                <div class="schedule-when">Weekly</div>
+                <div>
+                  <h3>Community Follow-up</h3>
+                  <p>
+                    Practice together and refresh your techniques with fellow course
+                    graduates.
+                  </p>
+                </div>
+                <span class="schedule-badge">Members</span>
+              </div>
+              <div class="schedule-item" data-category="community">
+                <div class="schedule-when">Weekly</div>
+                <div>
+                  <h3>Satsang & Chapter Gatherings</h3>
+                  <p>
+                    Music, meditation, knowledge and celebrations with the local
+                    community.
+                  </p>
+                </div>
+                <span class="schedule-badge">Open to all</span>
+              </div>
+              <div class="schedule-item" data-category="special">
+                <div class="schedule-when">Upcoming</div>
+                <div>
+                  <h3>Special Programs & Celebrations</h3>
+                  <p>Festivals, spiritual gatherings and special local events.</p>
+                </div>
+                <span class="schedule-badge">Events</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="community-sections">
+            <!-- Member activities are already covered in Schedule; keep this area focused on contributing. -->
+            <div class="community-card contribute-card" id="contribute">
+              <h3>Want to contribute?</h3>
+              <p>
+                Choose a way to contribute that fits your time and
+                interests—occasionally or as a regular responsibility.
+              </p>
+              <div class="community-links">
+                <a href="/seva">Programs, events & registrations →</a>
+                <a href="/seva">Calling, outreach & creative help →</a>
+                <a href="/seva">Other ways to contribute →</a>
+              </div>
+            </div>
+          </section>
+
+          <section class="mini-sections">
+            <a
+              class="mini"
+              id="contact"
+              href="https://wa.me/918884560660"
+              :href="centerWhatsappHref()"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div>
+                <h3>Need help choosing?</h3>
+                <p>Chat with the local team on WhatsApp.</p>
+              </div>
+              <span>→</span>
+            </a>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Primary mobile navigation">
+      <a class="nav-item active" href="#home"
+        ><span class="nav-icon"
+          ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m3 11 9-8 9 8v10h-6v-6H9v6H3V11Z" /></svg></span
+        ><span>Home</span></a
+      >
+      <a class="nav-item" href="#programs"
+        ><span class="nav-icon"
+          ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" /></svg></span
+        ><span>Programs</span></a
+      >
+      <a class="nav-item" href="#schedule"
+        ><span class="nav-icon"
+          ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 2v3m12-3v3M4 9h16M5 4h14a2 2 0 0 1 2 2v15H3V6a2 2 0 0 1 2-2Z" />
+            <path d="m8 15 2.2 2.2L16 12" /></svg></span
+        ><span>Schedule</span></a
+      >
+      <a
+        class="nav-item"
+        href="https://wa.me/918884560660"
+        :href="centerWhatsappHref()"
+        target="_blank"
+        rel="noopener noreferrer"
+        ><span class="nav-icon"
+          ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M20.5 11.5a8.5 8.5 0 0 1-12.8 7.3L3 20l1.3-4.5A8.5 8.5 0 1 1 20.5 11.5Z"
+            />
+            <path
+              d="M8.4 7.8c.4-.5.8-.4 1.1-.1l1.2 1.9c.2.3.1.6-.1.9l-.7.8c.7 1.5 1.9 2.7 3.5 3.4l.7-.8c.3-.3.6-.4.9-.2l1.9 1.1c.4.2.5.7.2 1.1-.7 1.1-1.9 1.6-3.1 1.3-4.2-1-7.3-4.1-8.2-8.1-.3-1.1.2-2.5 1.3-3.3"
+            /></svg></span
+        ><span>Contact</span></a
+      >
+      <button class="nav-item" id="moreButton" type="button">
+        <span class="nav-icon"
+          ><svg class="svg-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="5" cy="12" r="1.6" class="fill-icon" />
+            <circle cx="12" cy="12" r="1.6" class="fill-icon" />
+            <circle cx="19" cy="12" r="1.6" class="fill-icon" /></svg></span
+        ><span>More</span>
+      </button>
+    </nav>
+
+    <div class="menu-sheet" id="menuSheet" aria-hidden="true">
+      <div class="menu-panel">
+        <div class="menu-head">
+          <strong>Explore Seva Hub</strong>
+          <button class="close-btn" id="closeMenu" aria-label="Close menu">×</button>
+        </div>
+        <a class="menu-link" href="#programs">Programs <span>→</span></a>
+        <a class="menu-link" href="#schedule">Schedule <span>→</span></a>
+        <a
+          class="menu-link"
+          href="https://wa.me/918884560660"
+          :href="centerWhatsappHref()"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Contact <span>↗</span></a
+        >
+        <a class="menu-link" href="#contribute">Contribute <span>→</span></a>
+        <a class="menu-link" href="/privacy.html">Privacy Policy <span>→</span></a>
+        <a class="menu-link" href="/terms.html">Terms of Service <span>→</span></a>
+        <a class="menu-call" href="/seva">Open Seva Workspace</a>
+      </div>
+    </div>
+  </body>
+</html>

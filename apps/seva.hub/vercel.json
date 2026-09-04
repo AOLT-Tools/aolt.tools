@@ -1,0 +1,106 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/seva",
+      "destination": "/seva.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/api/seva/auth/signin",
+      "destination": "/api/auth?action=signin"
+    },
+    {
+      "source": "/api/seva/auth/callback",
+      "destination": "/api/auth?action=callback"
+    },
+    {
+      "source": "/api/seva/auth/session",
+      "destination": "/api/auth?action=session"
+    },
+    {
+      "source": "/api/seva/auth/signout",
+      "destination": "/api/auth?action=signout"
+    },
+    {
+      "source": "/api/seva/bootstrap",
+      "destination": "/api/bootstrap"
+    },
+    {
+      "source": "/api/seva/leads/assign",
+      "destination": "/api/leads?action=assign"
+    },
+    {
+      "source": "/api/seva/leads/:id",
+      "destination": "/api/leads?id=:id"
+    },
+    {
+      "source": "/api/seva/leads",
+      "destination": "/api/leads"
+    },
+    {
+      "source": "/api/seva/courses/:id",
+      "destination": "/api/courses?id=:id"
+    },
+    {
+      "source": "/api/seva/courses",
+      "destination": "/api/courses"
+    },
+    {
+      "source": "/api/seva/health/sheets",
+      "destination": "/api/health/sheets"
+    },
+    {
+      "source": "/api/seva/whatsapp/webhook",
+      "destination": "/api/whatsapp/webhook"
+    },
+    {
+      "source": "/go",
+      "destination": "/api/courses?go="
+    },
+    {
+      "source": "/go/:slug",
+      "destination": "/api/courses?go=:slug"
+    },
+    {
+      "source": "/courses",
+      "destination": "/api/courses?public=1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://accounts.google.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; object-src 'none'"
+        }
+      ]
+    }
+  ]
+}

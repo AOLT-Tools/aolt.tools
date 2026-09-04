@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+@source "./**/*.{html,ts}";
+
+@layer base {
+  [x-cloak] {
+    display: none !important;
+  }
+
+  :root {
+    --seva-hub-font-scale: 1;
+  }
+
+  html {
+    font-size: calc(16px * var(--seva-hub-font-scale));
+  }
+}

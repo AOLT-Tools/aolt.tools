@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "node",
+      "vite/client",
+      "vitest/globals"
+    ],
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "api",
+    "server",
+    "shared",
+    "src",
+    "vite.config.ts",
+    "../../packages/shared/types/**/*.d.ts"
+  ]
+}

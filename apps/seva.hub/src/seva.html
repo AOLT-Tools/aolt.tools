@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#312e81" />
+    <title>Seva Hub | Seva Workspace</title>
+    <link rel="icon" type="image/png" href="/assets/seva-hub-logo.png" />
+    <link rel="apple-touch-icon" href="/assets/seva-hub-logo.png" />
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+
+      .course-action-row {
+        display: grid;
+        grid-template-columns: repeat(5, 2rem);
+        align-items: center;
+        gap: 0.375rem;
+      }
+
+      .course-action-button {
+        display: inline-flex;
+        width: 2rem;
+        height: 2rem;
+        flex: 0 0 2rem;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .course-action-icon {
+        display: block;
+        width: 0.875rem;
+        height: 0.875rem;
+      }
+    </style>
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body
+    class="bg-slate-100 text-slate-800 font-sans antialiased max-w-md mx-auto min-h-screen flex flex-col"
+  >
+    <!-- Main App Container managed by Alpine.js -->
+    <div x-data="sevaWorkspace()" x-init="init()" class="flex flex-col flex-1 pb-6">
+      <template x-teleport="body">
+        <div
+          x-cloak
+          x-show="actionMessage"
+          x-transition.opacity
+          role="status"
+          class="fixed left-1/2 z-[100] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-xs text-emerald-700 shadow-lg backdrop-blur"
+          style="bottom: calc(5.5rem + env(safe-area-inset-bottom))"
+        >
+          <span x-text="actionMessage"></span>
+          <button
+            type="button"
+            @click="dismissActionMessage()"
+            class="shrink-0 font-medium text-emerald-700 hover:text-emerald-900"
+            aria-label="Dismiss message"
+          >
+            Dismiss
+          </button>
+        </div>
+      </template>
+
+      <!-- 1. HEADER SECTION -->
+      <header
+        x-cloak
+        x-show="authenticatedUser"
+        class="bg-white px-4 py-3 border-b border-slate-200 grid grid-cols-3 items-center sticky top-0 z-10 shadow-sm"
+      >
+        <div class="flex items-center">
+          <img
+            src="/assets/seva-hub-logo.png"
+            class="h-8 w-8 rounded-lg object-contain"
+            alt="Seva Hub"
+          />
+        </div>
+        <div class="flex flex-col items-center justify-center">
+          <span class="text-xs font-semibold text-slate-800">Seva Hub</span>
+        </div>
+        <div class="flex items-center justify-end space-x-3 relative">
+          <div class="relative" @keydown.escape.window="closeProfileMenu()">
+            <button
+              type="button"
+              @click="toggleProfileMenu()"
+              class="w-8 h-8 rounded-full border border-slate-300 bg-slate-50 overflow-hidden flex items-center justify-center"
+              aria-haspopup="menu"
+              :aria-expanded="isProfileMenuOpen"
+              aria-label="Profile menu"
+            >
+              <img
+                x-show="authenticatedUser && authenticatedUser.picture"
+                :src="authenticatedUser && authenticatedUser.picture ? authenticatedUser.picture : ''"
+                class="w-full h-full object-cover"
+                alt="Profile"
+              />
+              <span
+                x-show="!authenticatedUser || !authenticatedUser.picture"
+                class="text-[0.625rem] font-semibold text-slate-600"
+                x-text="getProfileInitials()"
+              ></span>
+            </button>
+
+            <div
+              x-show="isProfileMenuOpen"
+              x-transition.opacity
+              @click.outside="closeProfileMenu()"
+              class="absolute right-0 mt-2 w-52 bg-white border border-slate-200 rounded-lg shadow-lg p-2 z-50"
+              role="menu"
+              aria-label="Profile actions"
+            >
+              <div class="px-2 py-1.5 border-b border-slate-100 mb-1.5">
+                <div
+                  class="text-xs font-semibold text-slate-700 truncate"
+                  x-text="getProfileName()"
+                ></div>
+                <div
+                  class="text-[0.625rem] text-slate-500 truncate"
+                  x-text="authenticatedUser && authenticatedUser.email ? authenticatedUser.email : 'Not signed in'"
+                ></div>
+              </div>
+              <div class="px-2 py-1.5 border-b border-slate-100 mb-1.5">
+                <div class="mb-1.5 text-xs font-semibold text-slate-700">Text Size</div>
+                <div
+                  class="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1"
+                  role="group"
+                  aria-label="Text size"
+                >
+                  <button
+                    type="button"
+                    @click="setTextSize('normal')"
+                    class="rounded-md px-2 py-1.5 text-xs font-semibold transition"
+                    :class="textSize === 'normal' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                  >
+                    A
+                  </button>
+                  <button
+                    type="button"
+                    @click="setTextSize('large')"
+                    class="rounded-md px-2 py-1.5 text-sm font-semibold transition"
+                    :class="textSize === 'large' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                  >
+                    A+
+                  </button>
+                  <button
+                    type="button"
+                    @click="setTextSize('extraLarge')"
+                    class="rounded-md px-2 py-1.5 text-base font-semibold transition"
+                    :class="textSize === 'extraLarge' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+                  >
+                    A++
+                  </button>
+                </div>
+              </div>
+              <button
+                x-show="authenticatedUser"
+                type="button"
+                @click="signOutToLanding()"
+                class="w-full text-left px-2 py-1.5 text-xs rounded-md text-rose-700 hover:bg-rose-50"
+                role="menuitem"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="px-4 pt-4 pb-28 space-y-4 flex-1 relative">
+        <div
+          x-show="isLoadingBootstrap || isCampaignSwitching"
+          x-transition.opacity
+          class="absolute inset-0 z-20 bg-white/70 backdrop-blur-[1px] flex items-center justify-center rounded-xl"
+        >
+          <div
+            class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 shadow-sm text-sm text-slate-700"
+          >
+            <span
+              class="inline-block w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin"
+            ></span>
+            <span
+              x-text="isCampaignSwitching ? 'Switching Seva…' : (isCampaignRefreshing ? 'Refreshing Seva…' : (authenticatedUser ? 'Loading your Seva…' : 'Signing you in…'))"
+            ></span>
+          </div>
+        </div>
+
+        <section
+          x-cloak
+          x-show="isVolunteerModalOpen"
+          class="min-h-[calc(100vh-2rem)] flex items-center justify-center py-8"
+          aria-labelledby="seva-login-title"
+        >
+          <div
+            class="w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5 text-center"
+          >
+            <img
+              src="/assets/seva-hub-logo.png"
+              alt="Seva Hub"
+              class="w-24 h-24 rounded-2xl object-contain mx-auto border border-amber-100 shadow-sm"
+            />
+            <div>
+              <p
+                class="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600"
+              >
+                Private volunteer workspace
+              </p>
+              <h1
+                id="seva-login-title"
+                class="mt-2 text-2xl font-semibold text-slate-900 tracking-tight"
+              >
+                Welcome to Seva Hub
+              </h1>
+              <p class="text-sm leading-relaxed text-slate-600 mt-1.5">
+                Sign in with Google to continue to the Seva Workspace.
+              </p>
+            </div>
+            <div
+              x-show="authError"
+              role="alert"
+              class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-left text-xs text-rose-700"
+              x-text="authError"
+            ></div>
+            <button
+              type="button"
+              @click="startAuthFlow()"
+              class="w-full inline-flex items-center justify-center gap-3 rounded-xl bg-indigo-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            >
+              <svg viewBox="0 0 24 24" class="w-5 h-5" aria-hidden="true">
+                <path
+                  fill="#ffffff"
+                  d="M21.6 12.23c0-.71-.06-1.4-.18-2.06H12v3.9h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.4Z"
+                />
+                <path
+                  fill="#ffffff"
+                  opacity=".9"
+                  d="M12 22c2.7 0 4.98-.9 6.63-2.43l-3.24-2.52c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.05v2.6A10 10 0 0 0 12 22Z"
+                />
+                <path
+                  fill="#ffffff"
+                  opacity=".8"
+                  d="M6.39 13.88A6 6 0 0 1 6.08 12c0-.65.11-1.28.31-1.88v-2.6H3.05A10 10 0 0 0 2 12c0 1.61.39 3.14 1.05 4.48l3.34-2.6Z"
+                />
+                <path
+                  fill="#ffffff"
+                  opacity=".95"
+                  d="M12 5.99c1.47 0 2.8.5 3.84 1.5l2.87-2.87A9.65 9.65 0 0 0 12 2a10 10 0 0 0-8.95 5.52l3.34 2.6C7.18 7.75 9.39 6 12 6Z"
+                />
+              </svg>
+              Continue with Google
+            </button>
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left space-y-1.5"
+            >
+              <p class="text-xs font-semibold text-slate-700">
+                Secure Google authentication
+              </p>
+              <p class="text-[11px] leading-relaxed text-slate-500">
+                Google handles the sign-in process directly. Seva Hub never asks for,
+                receives, or stores your Google password. We only use the basic account
+                information needed to verify access for authorized volunteers.
+              </p>
+            </div>
+            <div
+              class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium"
+            >
+              <a href="/" class="text-slate-500 hover:text-indigo-700"
+                >Back to the chapter website</a
+              >
+              <a href="/privacy.html" class="text-slate-500 hover:text-indigo-700"
+                >Privacy Policy</a
+              >
+              <a href="/terms.html" class="text-slate-500 hover:text-indigo-700"
+                >Terms of Service</a
+              >
+            </div>
+          </div>
+        </section>
+
+        <div
+          x-cloak
+          x-show="!isVolunteerModalOpen"
+          :inert="isLoadingBootstrap || isCampaignSwitching"
+          :aria-busy="isLoadingBootstrap || isCampaignSwitching"
+          class="space-y-4"
+        >
+          <div
+            x-show="authError"
+            role="alert"
+            class="flex items-start justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+          >
+            <span x-text="authError"></span>
+            <button
+              type="button"
+              @click="dismissAuthError()"
+              class="shrink-0 font-medium text-rose-600 hover:text-rose-800"
+              aria-label="Dismiss error"
+            >
+              Dismiss
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-200/80 p-1">
+            <button
+              type="button"
+              @click="switchWorkspaceView('callTracker')"
+              class="rounded-lg px-3 py-2 text-xs font-semibold"
+              :class="workspaceView === 'callTracker' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'"
+            >
+              Call Tracker
+            </button>
+            <button
+              type="button"
+              @click="switchWorkspaceView('courseManagement')"
+              class="rounded-lg px-3 py-2 text-xs font-semibold"
+              :class="workspaceView === 'courseManagement' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'"
+            >
+              Activity Management
+            </button>
+          </div>
+
+          <div x-show="workspaceView === 'callTracker'" class="space-y-4">
+            <!-- 2. CAMPAIGN OVERVIEW CARD -->
+            <section
+              class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3"
+            >
+              <div class="flex justify-between items-center">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
+                  >Seva Overview</span
+                >
+                <span
+                  class="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium flex items-center gap-1"
+                >
+                  <span
+                    class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"
+                  ></span>
+                  Active
+                </span>
+              </div>
+
+              <div class="flex items-stretch gap-2">
+                <button
+                  type="button"
+                  @click="openCampaignSheet()"
+                  :disabled="isLoadingBootstrap || isCampaignSwitching"
+                  class="min-w-0 flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 font-medium text-slate-700 text-left flex items-center justify-between disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <span class="truncate" x-text="getSelectedCampaignName()"></span>
+                  <span
+                    x-show="isCampaignSwitching"
+                    class="inline-block w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin"
+                  ></span>
+                </button>
+                <button
+                  type="button"
+                  @click="refreshCurrentCampaign()"
+                  :disabled="isLoadingBootstrap || isCampaignSwitching || isCampaignRefreshing || isAssigningMembers"
+                  class="w-10 shrink-0 rounded-lg border border-slate-200 bg-white text-slate-600 flex items-center justify-center hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Refresh current Seva"
+                  title="Refresh current Seva"
+                >
+                  <i
+                    data-lucide="refresh-cw"
+                    class="w-4 h-4"
+                    :class="isCampaignRefreshing ? 'animate-spin' : ''"
+                  ></i>
+                </button>
+              </div>
+
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    @click="toggleFilterPanel()"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-medium"
+                  >
+                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+                    Filter
+                  </button>
+                  <span
+                    class="text-[0.625rem] text-slate-400 truncate"
+                    x-text="getFilterSummary()"
+                  ></span>
+                </div>
+
+                <div x-show="isFilterPanelOpen" x-transition.opacity class="space-y-2">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <template x-for="chip in filterOptions" :key="chip.id">
+                      <button
+                        type="button"
+                        @click="selectFilter(chip.id)"
+                        class="px-2 py-1 rounded-full text-[0.625rem] border transition-colors"
+                        :class="selectedFilter === chip.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200'"
+                        x-text="chip.label"
+                      ></button>
+                    </template>
+                  </div>
+
+                  <div class="relative">
+                    <i
+                      data-lucide="search"
+                      class="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2"
+                    ></i>
+                    <input
+                      type="text"
+                      x-model.debounce.250ms="searchQuery"
+                      aria-label="Search records"
+                      placeholder="Search name or phone"
+                      class="w-full pl-8 pr-16 text-xs border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      x-show="searchQuery"
+                      @click="clearSearch()"
+                      class="absolute right-1.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[0.625rem] rounded border border-slate-200 text-slate-500 bg-white"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  <!-- Program filter chips -->
+                  <div
+                    x-show="appConfig.programs && appConfig.programs.length > 0"
+                    class="pt-1"
+                  >
+                    <div class="text-[0.625rem] font-medium text-slate-400 mb-1">
+                      Filter by program
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        @click="clearProgramFilter()"
+                        class="px-2 py-1 rounded-full text-[0.625rem] border transition-colors"
+                        :class="programFilter === '' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200'"
+                      >
+                        All
+                      </button>
+                      <template
+                        x-for="prog in (appConfig.programs.length ? appConfig.programs : defaultPrograms)"
+                        :key="'pf-' + prog.code"
+                      >
+                        <button
+                          type="button"
+                          @click="toggleProgramFilter(prog.code)"
+                          class="px-2 py-1 rounded-full text-[0.625rem] border transition-colors"
+                          :class="programFilter === prog.code ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200'"
+                          x-text="prog.code"
+                        ></button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tappable Metrics Filters -->
+              <div class="pt-1">
+                <div
+                  class="bg-slate-50 rounded-xl border border-slate-200 p-1.5 flex items-center gap-1.5 overflow-x-auto"
+                >
+                  <button
+                    type="button"
+                    @click="setMetricFilter('all')"
+                    class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium border"
+                    :class="metricFilter === 'all' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'"
+                  >
+                    <span x-text="leads.length"></span> Total
+                  </button>
+                  <button
+                    type="button"
+                    @click="setMetricFilter('due')"
+                    class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium border"
+                    :class="metricFilter === 'due' ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-rose-700 border-rose-200'"
+                  >
+                    🔴 <span x-text="countDueFollowUps()"></span> Due
+                  </button>
+                  <button
+                    type="button"
+                    @click="setMetricFilter('upcoming')"
+                    class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium border"
+                    :class="metricFilter === 'upcoming' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-700 border-amber-200'"
+                  >
+                    🟡 <span x-text="countUpcomingFollowUps()"></span> Upcoming
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <!-- 3. LEADS QUEUE SECTION -->
+            <section class="space-y-3">
+              <div class="flex justify-between items-center">
+                <h2
+                  class="text-xs font-bold uppercase tracking-wider text-slate-500"
+                  x-text="getCampaignUiMeta().queueTitle"
+                ></h2>
+                <span
+                  class="text-xs text-slate-400"
+                  x-text="visibleLeads().length + ' shown · ' + filteredLeads().length + ' matching · ' + leads.length + ' total'"
+                ></span>
+              </div>
+
+              <!-- Reusable Lead Card Loop -->
+              <template
+                x-for="lead in visibleLeads()"
+                :key="getLeadKey(lead) + '|' + lead.programSummary"
+              >
+                <div
+                  class="bg-white rounded-xl shadow-sm border p-3.5 space-y-2.5 transition-colors touch-manipulation"
+                  :class="isLeadSelected(lead) ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-300 shadow-sm' : (activeCardId === getLeadKey(lead) ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-200 shadow-sm' : 'border-slate-200')"
+                  :data-card-id="getLeadKey(lead)"
+                  @pointerdown="handleCardPointerDown($event, lead)"
+                  @pointermove="handleCardPointerMove($event)"
+                  @pointerup="cancelCardLongPress()"
+                  @pointerleave="cancelCardLongPress()"
+                  @pointercancel="cancelCardLongPress()"
+                  @click.capture="handleCardClick($event, lead)"
+                  :aria-selected="isLeadSelected(lead)"
+                >
+                  <!-- Top Row: Quality, Follow-up, Last Updated -->
+                  <div class="flex justify-between items-start gap-2 text-xs">
+                    <div
+                      x-show="isSelectionMode()"
+                      class="flex items-center gap-2 min-w-0"
+                    >
+                      <span
+                        class="w-6 h-6 shrink-0 rounded-md border-2 flex items-center justify-center transition-colors"
+                        :class="isLeadSelected(lead) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-300 text-transparent'"
+                        aria-hidden="true"
+                        >✓</span
+                      >
+                      <span
+                        class="text-[11px] font-semibold text-indigo-700 truncate"
+                        x-text="isLeadSelected(lead) ? 'Selected' : 'Tap to select'"
+                      ></span>
+                    </div>
+                    <div
+                      x-show="!isSelectionMode()"
+                      class="flex items-center gap-1 flex-wrap min-w-0"
+                    >
+                      <button
+                        type="button"
+                        @click="openOptionSheet('quality', lead)"
+                        class="px-2 py-0.5 rounded font-medium border"
+                        :class="getQualityMeta(lead.quality).className"
+                        x-text="getQualityMeta(lead.quality).icon + ' ' + lead.quality"
+                      ></button>
+                      <span class="text-slate-500 flex items-center gap-1 min-w-0 ml-2">
+                        <button
+                          type="button"
+                          @click="openFollowUpPicker(lead)"
+                          class="inline-flex items-center gap-1 text-[11px] bg-transparent border-b border-dashed border-slate-300 focus:outline-none focus:border-indigo-500 max-w-[116px]"
+                        >
+                          <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                          <span
+                            class="truncate"
+                            x-text="formatRelativeDate(lead.followUp, 'Follow-up')"
+                          ></span>
+                        </button>
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <span
+                        class="text-[0.625rem] text-slate-400"
+                        x-text="formatShortDate(lead.lastUpdated, 'Just now')"
+                      ></span>
+                      <button
+                        type="button"
+                        x-show="lead.isDirty"
+                        @click="discardLeadChanges(lead)"
+                        class="inline-flex items-center justify-center w-6 h-6 rounded-full border border-slate-200 bg-white text-slate-500"
+                        aria-label="Discard record changes"
+                        title="Discard changes"
+                      >
+                        <span aria-hidden="true">↺</span>
+                      </button>
+                      <button
+                        type="button"
+                        x-show="lead.isDirty"
+                        @click="commitLeadChanges(lead)"
+                        class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white"
+                        aria-label="Save record changes"
+                        title="Save changes"
+                      >
+                        <span aria-hidden="true">✓</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Second Row: Editable Name, Call Status Dropdown, Call/WhatsApp Actions -->
+                  <div class="flex items-center justify-between gap-2">
+                    <!-- Name (Editable on double click) -->
+                    <div class="font-semibold text-slate-900 text-sm truncate flex-1">
+                      <span
+                        x-show="!lead.isEditingName"
+                        @dblclick="lead.isEditingName = true"
+                        x-text="lead.name"
+                        class="cursor-pointer"
+                        title="Double-click to edit name"
+                      ></span>
+                      <input
+                        type="text"
+                        x-show="lead.isEditingName"
+                        x-model="lead.name"
+                        @input="markLeadDirty(lead)"
+                        @blur="finishNameEditing(lead)"
+                        @keyup.enter="$event.currentTarget.blur()"
+                        @keyup.escape="$event.currentTarget.blur()"
+                        class="w-full border rounded px-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <div
+                        x-show="shouldShowProgramEditor()"
+                        @click="openProgramEditor(lead)"
+                        class="mt-0.5 text-[11px] leading-snug font-medium text-slate-500 truncate max-w-[220px] cursor-pointer"
+                        title="Tap to edit programs"
+                        x-text="lead.programSummary"
+                      ></div>
+                    </div>
+
+                    <!-- Call Status Badge -->
+                    <button
+                      type="button"
+                      @click="openOptionSheet('status', lead)"
+                      class="text-xs border border-slate-200 rounded px-2 py-1 bg-slate-50 text-slate-700"
+                      x-text="getStatusMeta(lead.status).icon + ' ' + lead.status"
+                    ></button>
+
+                    <!-- Call & WhatsApp Action Icons -->
+                    <div class="flex items-center space-x-1 text-slate-600">
+                      <!-- Native Phone Call -->
+                      <button
+                        @click="dialLead(lead)"
+                        type="button"
+                        :disabled="!cleanPhone(lead.mobile)"
+                        class="p-1.5 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 rounded-full transition-colors border border-slate-200"
+                        :class="!cleanPhone(lead.mobile) ? 'cursor-not-allowed opacity-40' : ''"
+                        title="Call Lead"
+                        aria-label="Call lead"
+                      >
+                        <i data-lucide="phone" class="w-4 h-4"></i>
+                      </button>
+                      <!-- WhatsApp Web/App Redirect -->
+                      <button
+                        type="button"
+                        x-show="canOpenWhatsapp(lead)"
+                        @click="openWhatsappForLead(lead)"
+                        class="p-1.5 bg-slate-50 hover:bg-green-50 hover:text-green-600 rounded-full transition-colors border border-slate-200"
+                        title="Open WhatsApp"
+                        aria-label="Open WhatsApp"
+                      >
+                        <svg
+                          data-icon="whatsapp"
+                          viewBox="0 0 16 16"
+                          fill="currentColor"
+                          class="w-4 h-4"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93a7.898 7.898 0 0 0-2.327-5.607m-5.607 12.2a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.066-.315-.099-.445.099-.133.197-.513.646-.627.775-.116.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.984-.59-.525-.987-1.175-1.103-1.372-.116-.198-.013-.306.087-.404.09-.088.197-.232.296-.346.1-.116.133-.198.198-.33.066-.133.033-.248-.017-.347-.05-.099-.445-1.076-.611-1.47-.16-.389-.323-.335-.445-.34-.116-.006-.248-.006-.38-.006a.729.729 0 0 0-.529.248c-.182.198-.69.677-.69 1.654s.71 1.916.81 2.049c.098.132 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.15.906.129 1.248.08.38-.058 1.171-.48 1.338-.943.164-.462.164-.86.116-.943-.05-.082-.182-.132-.38-.23"
+                          />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        @click="openImageShareForLead(lead)"
+                        class="p-1.5 bg-slate-50 hover:bg-sky-50 hover:text-sky-600 rounded-full transition-colors border border-slate-200"
+                        title="Share activity image"
+                        aria-label="Share activity image"
+                      >
+                        <i data-lucide="paperclip" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Third Row: Note Text Box -->
+                  <div>
+                    <textarea
+                      x-model="lead.notes"
+                      @input="markLeadDirty(lead)"
+                      aria-label="Record notes"
+                      rows="2"
+                      placeholder="Add notes..."
+                      class="w-full text-xs p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 text-slate-700 resize-none"
+                    ></textarea>
+                  </div>
+                </div>
+              </template>
+
+              <div x-show="hasMoreLeads()" class="flex justify-center pt-1">
+                <button
+                  type="button"
+                  @click="loadMoreLeads()"
+                  class="px-4 py-2 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  aria-label="Load more Seva records"
+                >
+                  Load more
+                </button>
+              </div>
+
+              <div
+                x-show="filteredLeads().length === 0"
+                class="bg-white rounded-xl border border-slate-200 p-4 text-center text-xs text-slate-500"
+              >
+                No records found for this filter or search.
+              </div>
+            </section>
+          </div>
+
+          <section
+            x-show="workspaceView === 'courseManagement'"
+            class="space-y-3"
+            aria-label="Activity management"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold text-slate-800">Activities</h2>
+              <button
+                type="button"
+                @click="openCourseEditor()"
+                class="inline-flex items-center gap-1 rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Add activity
+              </button>
+            </div>
+            <div
+              x-show="isLoadingCourses"
+              class="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500"
+            >
+              Loading activities…
+            </div>
+            <div
+              x-show="!isLoadingCourses && !courses.length"
+              class="rounded-xl border border-slate-200 bg-white p-4 text-center text-xs text-slate-500"
+            >
+              No activities yet. Add one to use in WhatsApp.
+            </div>
+            <template x-for="course in courses" :key="course.id">
+              <article
+                class="rounded-xl border border-slate-200 bg-white p-3 space-y-2"
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <h3
+                      class="text-sm font-semibold text-slate-800 truncate"
+                      x-text="courseDisplayTitle(course)"
+                    ></h3>
+                    <p
+                      class="text-[11px] text-slate-500 truncate"
+                      x-text="courseCardSubtitle(course)"
+                    ></p>
+                  </div>
+                  <span
+                    class="shrink-0 rounded-full px-2 py-0.5 text-[0.625rem] font-semibold"
+                    :class="course.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                    x-text="course.isActive ? 'Active' : 'Inactive'"
+                  ></span>
+                </div>
+                <img
+                  x-show="course.hasImage"
+                  :src="course.imageUrl"
+                  alt=""
+                  class="mx-auto max-h-96 max-w-full rounded-lg bg-slate-100 object-contain"
+                />
+                <div class="course-action-row">
+                  <button
+                    type="button"
+                    @click="openCourseEditor(course)"
+                    class="course-action-button rounded-lg border border-slate-200 text-slate-700"
+                    aria-label="Edit activity"
+                    title="Edit activity"
+                  >
+                    <i data-lucide="pencil" class="course-action-icon"></i>
+                  </button>
+                  <button
+                    type="button"
+                    x-show="canOpenPublicCoursePage(course)"
+                    @click="openPublicCoursePage(course)"
+                    class="course-action-button rounded-lg border border-slate-200 text-slate-700"
+                    aria-label="Open public page"
+                    title="Open public page"
+                  >
+                    <i data-lucide="external-link" class="course-action-icon"></i>
+                  </button>
+                  <button
+                    type="button"
+                    x-show="course.hasImage"
+                    @click="downloadCourseImage(course)"
+                    class="course-action-button rounded-lg border border-slate-200 text-slate-700"
+                    aria-label="Download image"
+                    title="Download image"
+                  >
+                    <i data-lucide="download" class="course-action-icon"></i>
+                  </button>
+                  <button
+                    type="button"
+                    @click="toggleCourseActive(course)"
+                    class="course-action-button rounded-lg border border-slate-200"
+                    :class="course.isActive ? 'text-amber-700' : 'text-emerald-700'"
+                    :aria-label="course.isActive ? 'Deactivate activity' : 'Activate activity'"
+                    :title="course.isActive ? 'Deactivate activity' : 'Activate activity'"
+                  >
+                    <i data-lucide="power" class="course-action-icon"></i>
+                  </button>
+                  <button
+                    type="button"
+                    @click="deleteCourse(course)"
+                    class="course-action-button rounded-lg border border-rose-200 text-rose-700"
+                    aria-label="Delete activity"
+                    title="Delete activity"
+                  >
+                    <i data-lucide="trash-2" class="course-action-icon"></i>
+                  </button>
+                </div>
+              </article>
+            </template>
+          </section>
+
+          <!-- Contextual floating action menu -->
+          <div
+            class="fixed z-30 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pointer-events-none"
+            style="bottom: max(1rem, env(safe-area-inset-bottom))"
+            x-show="authenticatedUser && !isVolunteerModalOpen && workspaceView === 'callTracker'"
+            @keydown.escape.window="handleSelectionBarEscape()"
+          >
+            <div
+              x-show="isSelectionMode()"
+              x-transition
+              class="pointer-events-auto flex items-center gap-2 rounded-2xl border border-indigo-200 bg-white/95 p-2 shadow-xl backdrop-blur"
+              aria-label="Selected record actions"
+            >
+              <button
+                type="button"
+                @click="clearSelection()"
+                :disabled="isBulkActionPending"
+                class="w-11 h-11 shrink-0 rounded-xl border border-slate-200 text-slate-600 disabled:opacity-50"
+                aria-label="Clear selection"
+                title="Clear selection"
+              >
+                <i data-lucide="x" class="w-5 h-5 mx-auto"></i>
+              </button>
+              <span
+                class="min-w-0 flex-1 text-sm font-semibold text-slate-800"
+                x-text="selectedCount() + ' selected'"
+              ></span>
+              <button
+                type="button"
+                @click="openMoveCampaignSheet()"
+                :disabled="isBulkActionPending"
+                class="w-11 h-11 shrink-0 rounded-xl bg-indigo-600 text-white disabled:opacity-50 flex items-center justify-center"
+                aria-label="Move to Seva"
+                title="Move to Seva"
+              >
+                <i data-lucide="folder-input" class="w-5 h-5"></i>
+              </button>
+              <button
+                type="button"
+                @click="openReassignVolunteerSheet()"
+                :disabled="isBulkActionPending"
+                class="w-11 h-11 shrink-0 rounded-xl bg-emerald-600 text-white disabled:opacity-50 flex items-center justify-center"
+                aria-label="Reassign volunteer"
+                title="Reassign volunteer"
+              >
+                <i data-lucide="user-cog" class="w-5 h-5"></i>
+              </button>
+              <button
+                type="button"
+                @click="deleteSelectedRecords()"
+                x-show="campaignType !== 'Members'"
+                :disabled="isBulkActionPending"
+                class="w-11 h-11 shrink-0 rounded-xl bg-rose-600 text-white disabled:opacity-50 flex items-center justify-center"
+                aria-label="Delete selected records"
+                title="Delete"
+              >
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+              </button>
+            </div>
+
+            <div x-show="!isSelectionMode()" class="flex flex-col items-end gap-2">
+              <div
+                x-show="isFabOpen"
+                x-transition
+                @click.outside="closeFab()"
+                class="pointer-events-auto flex min-w-44 flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur"
+              >
+                <button
+                  type="button"
+                  x-show="campaignType === 'Members'"
+                  @click="openAssignMembersModal()"
+                  :disabled="isLoadingBootstrap || isCampaignSwitching || isCampaignRefreshing || isAssigningMembers"
+                  class="min-h-11 rounded-xl px-3 text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 flex items-center gap-2 text-left text-xs font-semibold"
+                  aria-label="Assign members to me"
+                  title="Assign Members to Me"
+                >
+                  <i data-lucide="user-check" class="w-5 h-5"></i>
+                  <span>Assign members</span>
+                </button>
+                <button
+                  type="button"
+                  @click="openCreateRecord('Leads')"
+                  class="min-h-11 rounded-xl px-3 text-indigo-700 hover:bg-indigo-50 flex items-center gap-2 text-left text-xs font-semibold"
+                  aria-label="Add lead"
+                  title="Add Lead"
+                >
+                  <i data-lucide="user-plus" class="w-5 h-5"></i>
+                  <span>Add lead</span>
+                </button>
+                <button
+                  type="button"
+                  @click="openCreateRecord('Members')"
+                  class="min-h-11 rounded-xl px-3 text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 text-left text-xs font-semibold"
+                  aria-label="Add member"
+                  title="Add Member"
+                >
+                  <i data-lucide="user-round-plus" class="w-5 h-5"></i>
+                  <span>Add member</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                @click="toggleFab()"
+                class="pointer-events-auto w-14 h-14 rounded-full bg-indigo-700 text-white text-3xl leading-none shadow-xl border-4 border-white flex items-center justify-center"
+                :aria-expanded="isFabOpen"
+                aria-label="Open add actions"
+              >
+                <i
+                  data-lucide="plus"
+                  class="w-7 h-7 transition-transform"
+                  :class="isFabOpen ? 'rotate-45' : ''"
+                ></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Assign members dialog -->
+          <div
+            x-show="isAssignMembersModalOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeAssignMembersModal()"
+            @keydown.escape.window="closeAssignMembersModal()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-members-title"
+          >
+            <form
+              @submit.prevent="submitMemberAssignment()"
+              class="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-200 p-4 space-y-4"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <h3
+                  id="assign-members-title"
+                  class="text-base font-semibold text-slate-900"
+                >
+                  Assign Members to Me
+                </h3>
+                <span
+                  class="shrink-0 text-[11px] font-medium text-slate-500"
+                  x-text="leads.length + ' / 100 assigned'"
+                ></span>
+              </div>
+              <label class="block text-xs font-medium text-slate-700">
+                Number of members
+                <input
+                  type="number"
+                  x-model.number="assignMembersDraft.count"
+                  min="1"
+                  :max="memberAssignmentRemainingCapacity()"
+                  required
+                  inputmode="numeric"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </label>
+              <div class="block text-xs font-medium text-slate-700">
+                <span>Engagement level</span>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                  <template
+                    x-for="option in getMemberAssignmentEngagementOptions()"
+                    :key="option.value"
+                  >
+                    <button
+                      type="button"
+                      @click="toggleMemberAssignmentEngagement(option.value)"
+                      class="rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                      :class="isMemberAssignmentEngagementSelected(option.value) ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'"
+                      x-text="option.label"
+                    ></button>
+                  </template>
+                </div>
+              </div>
+              <div class="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  @click="closeAssignMembersModal()"
+                  :disabled="isAssigningMembers"
+                  class="min-h-11 px-4 rounded-xl border border-slate-200 text-sm text-slate-600 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  :disabled="isAssigningMembers || memberAssignmentRemainingCapacity() === 0"
+                  class="min-h-11 px-4 rounded-xl bg-emerald-600 text-sm font-semibold text-white disabled:opacity-50"
+                  x-text="isAssigningMembers ? 'Assigning…' : 'Assign members'"
+                ></button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Add lead/member dialog -->
+          <div
+            x-show="isCreateRecordModalOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeCreateRecord()"
+            @keydown.escape.window="closeCreateRecord()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-record-title"
+          >
+            <form
+              @submit.prevent="saveCreatedRecord()"
+              class="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-200 p-4 space-y-3"
+            >
+              <div>
+                <h3
+                  id="create-record-title"
+                  class="text-base font-semibold text-slate-900"
+                  x-text="createRecordType === 'Members' ? 'Add Member' : 'Add Lead'"
+                ></h3>
+                <p class="mt-1 text-xs text-slate-500">
+                  Create a record with a stable ID in the selected Seva.
+                </p>
+              </div>
+              <label class="block text-xs font-medium text-slate-700">
+                Name
+                <input
+                  type="text"
+                  x-model="createRecordDraft.name"
+                  required
+                  autocomplete="name"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </label>
+              <label class="block text-xs font-medium text-slate-700">
+                Mobile
+                <input
+                  type="tel"
+                  x-model="createRecordDraft.mobile"
+                  required
+                  autocomplete="tel"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </label>
+              <label class="block text-xs font-medium text-slate-700">
+                Seva
+                <select
+                  x-model="createRecordDraft.campaignId"
+                  required
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <template x-for="campaign in getCreateCampaigns()" :key="campaign.id">
+                    <option :value="campaign.id" x-text="campaign.name"></option>
+                  </template>
+                </select>
+              </label>
+              <label class="block text-xs font-medium text-slate-700">
+                Notes <span class="font-normal text-slate-400">(optional)</span>
+                <textarea
+                  x-model="createRecordDraft.notes"
+                  rows="2"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                ></textarea>
+              </label>
+              <div class="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  @click="closeCreateRecord()"
+                  :disabled="isCreateRecordSaving"
+                  class="min-h-11 px-4 rounded-xl border border-slate-200 text-sm text-slate-600 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  :disabled="isCreateRecordSaving"
+                  class="min-h-11 px-4 rounded-xl bg-indigo-600 text-sm font-semibold text-white disabled:opacity-50"
+                  x-text="isCreateRecordSaving ? 'Saving…' : (createRecordType === 'Members' ? 'Add Member' : 'Add Lead')"
+                ></button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Follow-up Date Time Popup -->
+          <div
+            x-show="isFollowUpModalOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-30 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeFollowUpPicker()"
+            @keydown.escape.window="closeFollowUpPicker()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="followup-modal-title"
+          >
+            <div
+              class="w-full max-w-xs bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-3"
+            >
+              <div
+                id="followup-modal-title"
+                class="text-sm font-semibold text-slate-800"
+              >
+                Set Follow-up
+              </div>
+              <input
+                x-ref="followUpInput"
+                type="datetime-local"
+                x-model="followUpDraft"
+                class="w-full text-sm border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  @click="clearFollowUpPicker()"
+                  class="px-3 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-600 bg-white"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  @click="closeFollowUpPicker()"
+                  class="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  @click="applyFollowUpPicker()"
+                  class="px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity editor -->
+          <div
+            x-show="isCourseEditorOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeCourseEditor()"
+            @keydown.escape.window="closeCourseEditor()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="course-editor-title"
+          >
+            <form
+              @submit.prevent="saveCourse()"
+              class="w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl border border-slate-200 p-4 space-y-3"
+            >
+              <h3
+                id="course-editor-title"
+                class="text-base font-semibold text-slate-900"
+                x-text="courseDraft.id ? 'Edit activity' : 'Add activity'"
+              ></h3>
+              <div
+                x-show="courseEditorError"
+                role="alert"
+                class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                x-text="courseEditorError"
+              ></div>
+              <div class="space-y-1">
+                <span class="block text-xs font-medium text-slate-700"
+                  >Activity type</span
+                >
+                <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-1.5 text-xs font-semibold"
+                    :class="courseDraft.activityType === 'Course' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'"
+                    @click="selectCourseActivityType('Course')"
+                  >
+                    Course
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-2 py-1.5 text-xs font-semibold"
+                    :class="courseDraft.activityType === 'Event' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'"
+                    @click="selectCourseActivityType('Event')"
+                  >
+                    Event
+                  </button>
+                </div>
+              </div>
+              <label
+                class="block text-xs font-medium text-slate-700"
+                x-show="!isCourseDraftEvent()"
+              >
+                Course type
+                <select
+                  x-model="courseDraft.courseType"
+                  :required="!isCourseDraftEvent()"
+                  @change="onCourseTypeChange()"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white"
+                >
+                  <template
+                    x-for="prog in (appConfig.programs.length ? appConfig.programs : defaultPrograms)"
+                    :key="prog.code"
+                  >
+                    <option
+                      :value="prog.code"
+                      x-text="prog.label + ' (' + prog.code + ')'"
+                    ></option>
+                  </template>
+                </select>
+              </label>
+              <label
+                class="block text-xs font-medium text-slate-700"
+                x-show="isCourseDraftEvent()"
+              >
+                Event name
+                <input
+                  type="text"
+                  x-model="courseDraft.title"
+                  :required="isCourseDraftEvent()"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                />
+              </label>
+              <div class="space-y-1" x-show="showsProgramTabs()">
+                <span class="block text-xs font-medium text-slate-700">Program</span>
+                <div class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+                  <template x-for="program in ipPrograms()" :key="program.code">
+                    <button
+                      type="button"
+                      class="rounded-md px-2 py-1.5 text-xs font-semibold"
+                      :class="courseDraft.programCode === program.code ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600'"
+                      x-text="program.label"
+                      @click="selectCourseProgram(program.code)"
+                    ></button>
+                  </template>
+                </div>
+                <span class="block text-[11px] font-normal text-slate-500">
+                  Add separate Junior and Senior courses. Each has its own message and
+                  image.
+                </span>
+              </div>
+              <label class="block text-xs font-medium text-slate-700">
+                WhatsApp template
+                <textarea
+                  x-model="courseDraft.whatsappTemplate"
+                  rows="14"
+                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono"
+                ></textarea>
+                <span class="mt-1 block text-[11px] font-normal text-slate-500">
+                  Put dates, time, venue, and registration in this message. {name} is
+                  optional.
+                </span>
+              </label>
+              <div class="space-y-1">
+                <span class="block text-xs font-medium text-slate-700">
+                  Activity image
+                  <span class="font-normal text-slate-400">(&lt; 3 MB)</span>
+                </span>
+                <div class="flex min-w-0 items-center gap-2">
+                  <label
+                    for="course-image-input"
+                    class="shrink-0 cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 focus-within:ring-2 focus-within:ring-slate-300"
+                  >
+                    <input
+                      id="course-image-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      @change="onImageSelected($event)"
+                      aria-describedby="course-image-status"
+                      class="sr-only"
+                    />
+                    Choose image
+                  </label>
+                  <span
+                    id="course-image-status"
+                    x-show="courseImageError"
+                    role="alert"
+                    class="min-w-0 text-xs font-medium text-rose-700"
+                    x-text="courseImageError"
+                  ></span>
+                  <span
+                    x-show="!courseImageError"
+                    class="min-w-0 truncate text-xs font-normal text-slate-500"
+                    x-text="courseImageFileName || (courseDraft.hasImage ? 'Current image' : 'No image selected')"
+                  ></span>
+                </div>
+              </div>
+              <img
+                x-show="courseDraft.imagePreviewUrl"
+                :src="courseDraft.imagePreviewUrl"
+                alt=""
+                class="mx-auto max-h-96 max-w-full rounded-lg bg-slate-100 object-contain"
+              />
+              <button
+                type="button"
+                x-show="courseDraft.hasImage || courseDraft.imagePreviewUrl"
+                @click="clearCourseImage()"
+                class="w-full rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700"
+              >
+                Remove image
+              </button>
+              <label class="flex items-center gap-2 text-xs font-medium text-slate-700">
+                <input type="checkbox" x-model="courseDraft.isActive" />
+                Active
+              </label>
+              <div class="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  @click="closeCourseEditor()"
+                  class="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  :disabled="isCourseSaving"
+                  class="px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- WhatsApp activity picker -->
+          <div
+            x-show="isCoursePickerOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeCoursePicker()"
+            @keydown.escape.window="closeCoursePicker()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="course-picker-title"
+          >
+            <div
+              class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-2"
+            >
+              <div
+                id="course-picker-title"
+                class="text-sm font-semibold text-slate-800"
+                x-text="coursePickerTitle()"
+              ></div>
+              <div
+                x-show="coursePickerOptions().length === 0"
+                class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500"
+              >
+                No activity image is available.
+              </div>
+              <template x-for="course in coursePickerOptions()" :key="course.id">
+                <button
+                  type="button"
+                  @click="selectCourseFromPicker(course)"
+                  class="w-full min-h-11 text-left px-2 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-700"
+                >
+                  <span class="font-medium" x-text="courseDisplayTitle(course)"></span>
+                  <span
+                    x-show="coursePickerSubtitle(course)"
+                    class="block text-[11px] text-slate-500"
+                    x-text="coursePickerSubtitle(course)"
+                  ></span>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <!-- Quality/Status Bottom Sheet -->
+          <div
+            x-show="isOptionSheetOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeOptionSheet()"
+            @keydown.escape.window="closeOptionSheet()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="option-sheet-title"
+          >
+            <div
+              class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-2"
+            >
+              <div
+                id="option-sheet-title"
+                class="text-sm font-semibold text-slate-800"
+                x-text="optionSheetTitle"
+              ></div>
+              <div
+                class="space-y-2"
+                :class="optionSheetMode === 'reassignVolunteer' ? 'max-h-[15rem] overflow-y-auto pr-1' : ''"
+              >
+                <template x-for="item in optionSheetOptions" :key="item.value">
+                  <button
+                    type="button"
+                    @click="applyOptionSelection(item.value)"
+                    class="w-full min-h-11 text-left px-2 py-2 rounded-lg text-sm border"
+                    :class="currentOptionValue === item.value ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700'"
+                    x-text="item.icon ? (item.icon + ' ' + item.label) : item.label"
+                  ></button>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Member Program Multi-Select Sheet -->
+          <div
+            x-show="isProgramEditorOpen"
+            x-transition.opacity
+            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            @click.self="closeProgramEditor()"
+            @keydown.escape.window="closeProgramEditor()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="program-editor-title"
+          >
+            <div
+              class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-3"
+            >
+              <div
+                id="program-editor-title"
+                class="text-sm font-semibold text-slate-800"
+              >
+                Edit Programs
+              </div>
+
+              <div class="space-y-2">
+                <div class="text-xs font-medium text-slate-600">🎯 Wishlist</div>
+                <div class="flex flex-wrap gap-1.5">
+                  <template
+                    x-for="program in (appConfig.programs.length ? appConfig.programs : defaultPrograms)"
+                    :key="'wishlist-' + program.code"
+                  >
+                    <button
+                      type="button"
+                      @click="toggleProgramSelection('wishlist', program.code)"
+                      class="px-2 py-1 rounded-full text-[11px] border"
+                      :class="isProgramSelected('wishlist', program.code) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-700 border-slate-200'"
+                      x-text="program.code"
+                    ></button>
+                  </template>
+                </div>
+              </div>
+
+              <div class="space-y-2" x-show="shouldShowDonePrograms()">
+                <div class="text-xs font-medium text-slate-600">✅ Completed</div>
+                <div class="flex flex-wrap gap-1.5">
+                  <template
+                    x-for="program in (appConfig.programs.length ? appConfig.programs : defaultPrograms)"
+                    :key="'done-' + program.code"
+                  >
+                    <button
+                      type="button"
+                      @click="toggleProgramSelection('done', program.code)"
+                      class="px-2 py-1 rounded-full text-[11px] border"
+                      :class="isProgramSelected('done', program.code) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'"
+                      x-text="program.code"
+                    ></button>
+                  </template>
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  @click="closeProgramEditor()"
+                  class="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  @click="applyProgramEditor()"
+                  class="px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

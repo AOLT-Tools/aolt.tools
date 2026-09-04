@@ -1,0 +1,25 @@
+{
+  "name": "@aolt/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "exports": {
+    "./*": {
+      "types": "./*.tsx",
+      "node": "./dist/*.js",
+      "default": "./*.tsx"
+    }
+  },
+  "dependencies": {
+    "@aolt/shared": "workspace:*",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "typescript": "6.0.3",
+    "@vercel/node": "8.1.2"
+  }
+}

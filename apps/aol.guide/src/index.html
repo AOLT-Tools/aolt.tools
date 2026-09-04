@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en" class="bg-stone-50">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fafaf9" />
+    <title>AOL Guide</title>
+    <link rel="stylesheet" href="/main.css" />
+  </head>
+  <body class="min-h-screen bg-stone-50 text-stone-900 antialiased">
+    <header
+      class="sticky top-0 z-30 border-b border-stone-200/80 bg-stone-50/95 backdrop-blur-xl"
+    >
+      <div
+        class="mx-auto flex min-h-16 w-full max-w-[780px] items-center justify-between gap-4 px-4 py-3"
+      >
+        <div class="min-w-0">
+          <h1 class="truncate text-[22px] leading-none font-bold tracking-tight">
+            AOL Guide
+          </h1>
+          <p class="mt-1.5 truncate text-xs text-stone-500">
+            Official program search, made easier
+          </p>
+        </div>
+        <span class="sync-pill" id="status-pill" hidden></span>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-[780px] px-4 pb-16">
+      <section class="pt-7 pb-7 sm:pt-10 sm:pb-8" aria-labelledby="search-heading">
+        <div class="mb-5">
+          <h2
+            id="search-heading"
+            class="text-[27px] leading-[1.12] font-bold tracking-[-0.025em] sm:text-3xl"
+          >
+            What are you looking for?
+          </h2>
+          <p class="mt-2 text-sm leading-6 text-stone-500">
+            One search. We interpret it and show matching programs from the
+            official Art of Living, Bangalore Ashram, or Vaidic Puja pages.
+          </p>
+        </div>
+
+        <form id="search-form" role="search">
+          <label for="query" class="sr-only">Search courses, pujas and ashram programs</label>
+          <div class="relative">
+            <span
+              class="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 text-stone-400"
+              aria-hidden="true"
+            >
+              <svg
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
+            </span>
+
+            <input
+              id="query"
+              name="query"
+              type="search"
+              autocomplete="off"
+              enterkeyhint="search"
+              placeholder="Try: HP near 560045 within 10km"
+              aria-controls="search-suggestions"
+              aria-expanded="false"
+              required
+              class="h-14 w-full rounded-2xl border border-stone-200 bg-white pr-16 pl-12 text-base text-stone-900 shadow-sm outline-none transition placeholder:text-stone-400 focus:border-emerald-600/60 focus:ring-4 focus:ring-emerald-600/10 sm:h-[60px] sm:text-[17px]"
+            />
+
+            <button
+              type="submit"
+              aria-label="Search"
+              class="absolute top-1/2 right-1.5 z-10 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-xl bg-emerald-700 text-white transition hover:bg-emerald-800 active:scale-95"
+            >
+              <svg
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12h14"></path>
+                <path d="m14 7 5 5-5 5"></path>
+              </svg>
+            </button>
+
+            <div
+              class="suggestions"
+              id="search-suggestions"
+              role="listbox"
+              hidden
+            ></div>
+          </div>
+        </form>
+
+        <p class="mt-2 text-xs leading-5 text-stone-400">
+          Try: HP near 560045 within 10km
+        </p>
+
+        <div class="mt-5">
+          <p class="text-xs font-semibold tracking-wide text-stone-500">
+            Popular searches
+          </p>
+          <div
+            class="example-links -mx-1 mt-2.5 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            aria-label="Popular searches"
+          >
+            <a class="search-chip" href="#" data-query="HP near 560045 within 10km">HP nearby</a>
+            <a class="search-chip" href="#" data-query="HP 560045 Hindi this weekend">This weekend</a>
+            <a class="search-chip" href="#" data-query="AMP Bangalore Ashram next weekend">Ashram AMP</a>
+            <a class="search-chip" href="#" data-query="Rudra Puja this weekend">Rudra Puja</a>
+            <a class="search-chip" href="#" data-query="Intuition near 560001">Intuition</a>
+            <a class="search-chip" href="#" data-query="HP online">Online</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="summary-strip" id="summary-strip" hidden></section>
+      <section id="interpretation" hidden></section>
+
+      <section aria-live="polite">
+        <div class="results-heading mb-3 text-sm font-semibold text-stone-600" id="results-heading" hidden>
+          <span id="results-count"></span>
+        </div>
+        <div class="grid gap-3" id="results"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/search.ts"></script>
+  </body>
+</html>
