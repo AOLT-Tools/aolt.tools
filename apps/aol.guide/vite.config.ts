@@ -8,7 +8,7 @@ const repoDir = resolve(appDir, '../..');
 
 export default defineConfig({
   root: resolve(appDir, 'src'),
-  publicDir: false,
+  publicDir: resolve(appDir, 'public'),
   plugins: [
     tailwindcss(),
     {
@@ -48,7 +48,11 @@ export default defineConfig({
 });
 
 function attachSearchApi(server: {
-  middlewares: { use: (handler: (req: IncomingMessage, res: NodeResponse, next: () => void) => void) => void };
+  middlewares: {
+    use: (
+      handler: (req: IncomingMessage, res: NodeResponse, next: () => void) => void
+    ) => void;
+  };
 }) {
   server.middlewares.use(async (req, res, next) => {
     const url = req.url?.split('?')[0] || '';

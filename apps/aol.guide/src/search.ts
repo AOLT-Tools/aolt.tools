@@ -53,9 +53,6 @@ const searchSuggestions = document.querySelector<HTMLElement>('#search-suggestio
 const results = document.querySelector<HTMLElement>('#results');
 const statusPill = document.querySelector<HTMLElement>('#status-pill');
 const summaryStrip = document.querySelector<HTMLElement>('#summary-strip');
-const interpretation = document.querySelector<HTMLElement>('#interpretation');
-const resultsHeading = document.querySelector<HTMLElement>('#results-heading');
-const resultsCount = document.querySelector<HTMLElement>('#results-count');
 const exampleActions = document.querySelectorAll<HTMLElement>(
   '.example-links [data-query]'
 );
@@ -66,7 +63,7 @@ let renderedSuggestions: string[] = [];
 initializeSearchPage();
 
 function initializeSearchPage() {
-  if (!searchForm || !searchInput || !results || !statusPill || !summaryStrip) {
+  if (!searchForm || !searchInput || !results || !statusPill) {
     return;
   }
 
@@ -259,11 +256,9 @@ async function runSearch(query: string) {
   searchAbort = controller;
   const requestId = ++searchRequestId;
 
-  setStatus('Searching', 'loading');
-  hideResultCount();
+  setStatus('Searching…', 'loading');
   if (summaryStrip) summaryStrip.hidden = true;
-  if (interpretation) interpretation.hidden = true;
-  results.replaceChildren(emptyNode('Interpreting your search...'));
+  results.replaceChildren(emptyNode('Searching…'));
 
   try {
     const payload = await fetchSearch(trimmed, controller.signal);
@@ -272,13 +267,10 @@ async function runSearch(query: string) {
       throw new Error(payload.error?.message || 'Search failed.');
     }
     renderMessages(payload.messages || []);
-    renderInterpretation(payload.interpretation || []);
     renderSources(payload.sources || []);
-    setStatus(payload.usedGemini ? 'Gemini assisted' : '');
+    setStatus('');
   } catch (error) {
     if (controller.signal.aborted || requestId !== searchRequestId) return;
-    hideResultCount();
-    if (interpretation) interpretation.hidden = true;
     results.replaceChildren(
       emptyNode(error instanceof Error ? error.message : 'Search failed.')
     );
@@ -286,7 +278,10 @@ async function runSearch(query: string) {
   }
 }
 
-async function fetchSearch(query: string, signal: AbortSignal): Promise<SearchResponse> {
+async function fetchSearch(
+  query: string,
+  signal: AbortSignal
+): Promise<SearchResponse> {
   const response = await fetch('/api/search', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -313,188 +308,92 @@ function renderMessages(messages: string[]) {
   summaryStrip.hidden = false;
 }
 
-function renderInterpretation(rows: InterpretationRow[]) {
-  if (!interpretation) return;
-  if (!rows.length) {
-    interpretation.hidden = true;
-    interpretation.replaceChildren();
-    return;
-  }
-
-  const heading = document.createElement('h2');
-  heading.textContent = 'Interpreted search';
-  const list = document.createElement('dl');
-  for (const row of rows) {
-    const item = document.createElement('div');
-    const term = document.createElement('dt');
-    const value = document.createElement('dd');
-    term.textContent = row.label;
-    value.textContent = row.value;
-    item.append(term, value);
-    list.append(item);
-  }
-  interpretation.className = 'interpretation';
-  interpretation.replaceChildren(heading, list);
-  interpretation.hidden = false;
-}
-
 function renderSources(items: SourceSearchResult[]) {
   if (!results) return;
   if (!items.length) {
-    hideResultCount();
-    results.replaceChildren(
-      emptyNode('No matching official source. Try a course, ashram, or puja search.')
-    );
+    results.replaceChildren(emptyNode('No matching programs. Try another search.'));
     return;
   }
 
   const nodes: HTMLElement[] = [];
+  let moreUrl = '';
+
   for (const item of items) {
-    nodes.push(renderSourceCard(item));
-    if (item.listingError && !item.listings?.length) {
+    const listings = item.listings || [];
+    if (listings.length) {
+      for (const listing of listings) {
+        nodes.push(renderListingCard(listing));
+      }
+      if (
+        typeof item.listingTotal === 'number' &&
+        item.listingTotal > listings.length
+      ) {
+        moreUrl = item.url;
+      }
+      continue;
+    }
+
+    if (item.listingError) {
       nodes.push(emptyNode(item.listingError));
+      continue;
     }
-    for (const listing of item.listings || []) {
-      nodes.push(renderListingCard(listing));
-    }
+
     if (
       item.source === 'aol' &&
       typeof item.listingTotal === 'number' &&
-      item.listingTotal === 0 &&
-      !item.listingError
+      item.listingTotal === 0
     ) {
-      nodes.push(emptyNode('No matching programs on the official Art of Living search.'));
+      nodes.push(emptyNode('No matching programs nearby.'));
+      continue;
     }
+
+    nodes.push(renderOfficialLinkCard(item));
+  }
+
+  if (moreUrl) {
+    nodes.push(moreResultsLink(moreUrl));
   }
 
   results.replaceChildren(...nodes);
-  renderResultCount(items);
 }
 
-function renderResultCount(items: SourceSearchResult[]) {
-  if (!resultsHeading || !resultsCount) return;
-
-  const listingSources = items.filter(
-    (item) => typeof item.listingTotal === 'number' && !item.listingError
-  );
-  if (listingSources.length) {
-    const shown = listingSources.reduce(
-      (count, item) => count + (item.listings?.length || 0),
-      0
-    );
-    const total = listingSources.reduce(
-      (count, item) => count + (item.listingTotal || 0),
-      0
-    );
-    resultsCount.textContent =
-      total > shown
-        ? 'Showing ' + String(shown) + ' of ' + formatCount(total) + ' listings'
-        : formatCount(total) + (total === 1 ? ' listing' : ' listings');
-    resultsHeading.hidden = false;
-    return;
-  }
-
-  resultsCount.textContent =
-    items.length === 1 ? '1 official source' : String(items.length) + ' official sources';
-  resultsHeading.hidden = false;
-}
-
-function formatCount(value: number): string {
-  return value.toLocaleString('en-IN');
-}
-
-function renderSourceCard(item: SourceSearchResult): HTMLElement {
+function renderOfficialLinkCard(item: SourceSearchResult): HTMLElement {
   const card = document.createElement('article');
-  card.className =
-    'result-card' + (item.listings?.length ? ' source-card' : '');
+  card.className = 'result-card';
+  makeCardClickable(card, item.url);
 
-  const header = document.createElement('header');
-  const title = document.createElement('h2');
-  title.textContent = item.label;
-  const labels = document.createElement('div');
-  labels.className = 'result-card-labels';
+  const row = document.createElement('div');
+  row.className = 'source-compact';
+  const copy = document.createElement('div');
   const badge = document.createElement('span');
   badge.className =
     'badge' +
-    (item.source === 'vvmvp' ? ' vvmvp-badge' : item.source === 'vds' ? ' vds-badge' : '');
+    (item.source === 'vvmvp'
+      ? ' vvmvp-badge'
+      : item.source === 'vds'
+        ? ' vds-badge'
+        : '');
   badge.textContent = sourceBadge(item.source);
-  labels.append(badge);
-  if (typeof item.listingTotal === 'number' && !item.listingError) {
-    const count = document.createElement('span');
-    count.className = 'course-code';
-    count.textContent = formatCount(item.listingTotal) + ' official listings';
-    labels.append(count);
-  }
-  header.append(title, labels);
+  const title = document.createElement('h2');
+  title.className = 'mt-1';
+  title.textContent = item.label;
+  copy.append(badge, title);
+  const action = document.createElement('span');
+  action.className = 'listing-link';
+  action.textContent = 'Open';
+  row.append(copy, action);
+  card.append(row);
+  return card;
+}
 
-  const reason = document.createElement('p');
-  reason.className = 'm-0 text-sm leading-6 text-stone-600';
-  reason.textContent = item.reason;
-
-  const filters = document.createElement('ul');
-  filters.className = 'filter-list';
-  for (const [key, value] of Object.entries(item.filters)) {
-    const row = document.createElement('li');
-    row.textContent = titleCase(key) + ': ' + value;
-    filters.append(row);
-  }
-
-  card.append(header, reason);
-  if (!item.listings?.length) card.append(filters);
-
-  const url = document.createElement('p');
-  url.className = 'source-url';
-  url.textContent = item.url;
-  if (!item.listings?.length) card.append(url);
-
-  for (const note of item.unsupportedFilters) {
-    const warning = document.createElement('p');
-    warning.className = 'result-note';
-    warning.textContent = note;
-    card.append(warning);
-  }
-
-  const actions = document.createElement('div');
-  actions.className = 'card-actions';
+function moreResultsLink(url: string): HTMLAnchorElement {
   const link = document.createElement('a');
-  link.className = 'result-link';
-  link.href = item.url;
+  link.className = 'more-link';
+  link.href = url;
   link.target = '_blank';
   link.rel = 'noreferrer';
-  link.textContent =
-    typeof item.listingTotal === 'number' && item.listingTotal > (item.listings?.length || 0)
-      ? 'View all official results'
-      : 'View official results';
-  actions.append(link);
-
-  if (item.embeddable && !item.listings?.length) {
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'preview-toggle';
-    toggle.textContent = 'Preview official page';
-    const frame = document.createElement('iframe');
-    frame.className = 'source-preview';
-    frame.title = item.label + ' preview';
-    frame.hidden = true;
-    frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
-    toggle.addEventListener('click', () => {
-      if (frame.hidden) {
-        frame.src = item.url;
-        frame.hidden = false;
-        toggle.textContent = 'Hide preview';
-      } else {
-        frame.hidden = true;
-        frame.removeAttribute('src');
-        toggle.textContent = 'Preview official page';
-      }
-    });
-    actions.append(toggle);
-    card.append(actions, frame);
-  } else {
-    card.append(actions);
-  }
-
-  return card;
+  link.textContent = 'More on official site';
+  return link;
 }
 
 function renderListingCard(item: OfficialCourseListing): HTMLElement {
@@ -504,19 +403,16 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const header = document.createElement('header');
   const title = document.createElement('h2');
   title.textContent = item.title;
-  const labels = document.createElement('div');
-  labels.className = 'result-card-labels';
-  const badge = document.createElement('span');
-  badge.className = 'badge';
-  badge.textContent = 'Course';
-  labels.append(badge);
+  header.append(title);
   if (item.isOnline) {
+    const labels = document.createElement('div');
+    labels.className = 'result-card-labels';
     const online = document.createElement('span');
     online.className = 'badge online-badge';
     online.textContent = 'Online';
     labels.append(online);
+    header.append(labels);
   }
-  header.append(title, labels);
 
   const meta = document.createElement('div');
   meta.className = 'result-meta';
@@ -526,9 +422,8 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const secondary = document.createElement('div');
   secondary.className = 'result-meta-secondary';
   for (const part of [
-    typeof item.distanceKm === 'number' ? item.distanceKm.toFixed(1) + ' km away' : '',
+    typeof item.distanceKm === 'number' ? item.distanceKm.toFixed(1) + ' km' : '',
     item.languages.join(', '),
-    item.teachers.join(', '),
     item.fee
   ].filter(Boolean)) {
     const span = document.createElement('span');
@@ -540,18 +435,7 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   if (secondary.childElementCount) card.append(secondary);
 
   const url = item.registerUrl || item.detailUrl;
-  if (url) {
-    makeCardClickable(card, url);
-    const link = document.createElement('a');
-    link.className = 'listing-link';
-    link.href = url;
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    link.textContent = 'Register / details';
-    link.addEventListener('click', (event) => event.stopPropagation());
-    card.append(link);
-  }
-
+  if (url) makeCardClickable(card, url);
   return card;
 }
 
@@ -606,18 +490,6 @@ function sourceBadge(source: string): string {
   if (source === 'vvmvp') return 'Ashram';
   if (source === 'vds') return 'Vaidic Puja';
   return 'Art of Living';
-}
-
-function titleCase(value: string): string {
-  return value.replace(/(^|[_\s])([a-z])/g, (_, prefix: string, letter: string) => {
-    return (prefix === '_' ? ' ' : prefix) + letter.toUpperCase();
-  });
-}
-
-function hideResultCount() {
-  if (!resultsHeading || !resultsCount) return;
-  resultsHeading.hidden = true;
-  resultsCount.textContent = '';
 }
 
 function emptyNode(label: string): HTMLElement {
