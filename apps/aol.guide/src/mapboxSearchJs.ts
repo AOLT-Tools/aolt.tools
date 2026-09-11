@@ -1,6 +1,3 @@
-export const MAPBOX_SEARCH_JS_SRC =
-  'https://api.mapbox.com/search-js/v1.4.0/web.js';
-
 export type MapboxSearchBoxElement = HTMLElement & {
   accessToken: string;
   placeholder: string;
@@ -24,23 +21,12 @@ export type BrowserLocation = {
   city?: string;
 };
 
-export function loadMapboxSearchJs(): Promise<MapboxSearchJs> {
-  const existing = (window as Window & { mapboxsearch?: MapboxSearchJs })
-    .mapboxsearch;
-  if (existing) return Promise.resolve(existing);
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = MAPBOX_SEARCH_JS_SRC;
-    script.onload = () => {
-      const loaded = (window as Window & { mapboxsearch?: MapboxSearchJs })
-        .mapboxsearch;
-      if (loaded) resolve(loaded);
-      else reject(new Error('mapboxsearch global was not set'));
-    };
-    script.onerror = () =>
-      reject(new Error('Could not load ' + MAPBOX_SEARCH_JS_SRC));
-    document.head.appendChild(script);
-  });
+export async function loadMapboxSearchJs(): Promise<MapboxSearchJs> {
+  const { MapboxSearchBox, autofill } = await import('@mapbox/search-js-web');
+  return {
+    MapboxSearchBox: MapboxSearchBox as unknown as MapboxSearchJs['MapboxSearchBox'],
+    autofill
+  };
 }
 
 export function locationFromMapboxRetrieve(

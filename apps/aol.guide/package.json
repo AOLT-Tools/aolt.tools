@@ -19,6 +19,7 @@
   "dependencies": {
     "@aolt/core": "workspace:*",
     "@aolt/integrations": "workspace:*",
+    "@mapbox/search-js-web": "1.5.1",
     "zod": "4.4.3"
   },
   "devDependencies": {

@@ -603,7 +603,8 @@ async function mountMapboxSearchBox() {
       selectedLocation = undefined;
     });
     locationHost.replaceChildren(box);
-  } catch {
+  } catch (error) {
+    console.error('Mapbox Search Box failed to mount', error);
     if (fallback) fallback.placeholder = 'Location unavailable';
   }
 }
