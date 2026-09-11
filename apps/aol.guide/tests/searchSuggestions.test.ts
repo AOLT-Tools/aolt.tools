@@ -46,4 +46,22 @@ describe('AOL Guide search suggestions', () => {
     expect(getSearchSuggestions('HP near 560045').length).toBeLessThanOrEqual(6);
     expect(getSearchSuggestions('teacher').length).toBeLessThanOrEqual(6);
   });
+
+  it('uses the Mapbox location instead of a default PIN', () => {
+    expect(
+      getSearchSuggestions('teacher Alex', { locationLabel: 'HSR Layout' })
+    ).toEqual(
+      expect.arrayContaining([
+        'teacher Alex within 5km',
+        'teacher Alex within 10km',
+        'teacher Alex within 25km'
+      ])
+    );
+    expect(
+      getSearchSuggestions('teacher Alex', { locationLabel: 'HSR Layout' }).join(' ')
+    ).not.toContain('560045');
+    expect(
+      getSearchSuggestions('HP', { locationLabel: 'HSR Layout' }).join(' ')
+    ).not.toContain('560045');
+  });
 });

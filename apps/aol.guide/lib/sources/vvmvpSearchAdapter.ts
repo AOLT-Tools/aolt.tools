@@ -59,9 +59,7 @@ export function vvmvpSearchText(intent: ResolvedSearchIntent): string {
 }
 
 function isBangaloreLocation(intent: ResolvedSearchIntent): boolean {
-  return /\b(bangalore|bengaluru)\b/i.test(
-    [intent.city, intent.rawQuery].filter(Boolean).join(' ')
-  );
+  return /\b(bangalore|bengaluru)\b/i.test(intent.rawQuery);
 }
 
 function vvmvpConfidence(intent: ResolvedSearchIntent): number {
@@ -86,7 +84,7 @@ function unsupportedVvmvpFilters(intent: ResolvedSearchIntent): string[] {
   if (intent.dateFrom || intent.dateTo) {
     unsupported.push('Date filters are not exposed as VVMVP URL parameters');
   }
-  if (intent.pincode || intent.radiusKm) {
+  if (intent.pincode || intent.radiusKm || intent.latitude || intent.longitude) {
     unsupported.push('PIN / distance filters are not exposed as VVMVP URL parameters');
   }
   if (intent.language) {

@@ -153,7 +153,9 @@ function initializeSearchPage() {
 function renderSuggestions(value: string) {
   if (!searchInput || !searchSuggestions) return;
 
-  const suggestions = getSearchSuggestions(value);
+  const suggestions = getSearchSuggestions(value, {
+    locationLabel: currentMode === 'in_person' ? selectedLocation?.label : undefined
+  });
   renderedSuggestions = suggestions;
   activeSuggestionIndex = -1;
 

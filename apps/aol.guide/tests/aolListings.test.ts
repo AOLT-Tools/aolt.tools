@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { parseSearchQuery } from '../lib/queryParser.js';
 import {
   buildAolApiSearchUrl,
+  filterListingsByIntent,
   normalizeAolListing,
   sortListingsByDistance
 } from '../lib/sources/aolListings.js';
@@ -78,5 +80,30 @@ describe('Art of Living live listings', () => {
         (item) => item.title
       )
     ).toEqual(['Near', 'Mid', 'Far', 'Unknown']);
+  });
+
+  it('keeps listings that match the teacher, language, and in-person intent', () => {
+    const alex = normalizeAolListing(
+      sampleAolCourse({ sao_id: 1, title: 'Alex Follow Up', teachers: ['Alex Kumar'] })
+    );
+    const sam = normalizeAolListing(
+      sampleAolCourse({ sao_id: 2, title: 'Sam Follow Up', teachers: ['Sam'] })
+    );
+    const online = normalizeAolListing(
+      sampleAolCourse({
+        sao_id: 3,
+        title: 'Online with Alex',
+        teachers: ['Alex Kumar'],
+        is_online_event: 1,
+        dist: undefined
+      })
+    );
+    const listings = [alex, sam, online].filter((item) => item != null);
+    expect(
+      filterListingsByIntent(listings, {
+        ...parseSearchQuery('teacher Alex', { now: new Date('2026-09-04T06:30:00.000Z') }),
+        deliveryMode: 'in_person'
+      }).map((item) => item.title)
+    ).toEqual(['Alex Follow Up']);
   });
 });

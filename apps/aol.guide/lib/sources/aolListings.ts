@@ -1,4 +1,8 @@
-import type { OfficialCourseListing } from '../searchIntent.js';
+import type {
+  DeliveryMode,
+  OfficialCourseListing,
+  ResolvedSearchIntent
+} from '../searchIntent.js';
 
 export const AOL_COURSE_API_URL = 'https://www.artofliving.org/new-search-course';
 export const AOL_LISTING_PAGE_SIZE = 20;
@@ -160,6 +164,64 @@ export function sortListingsByDistance(
     if (isFiniteDistance(right.distanceKm)) return 1;
     return 0;
   });
+}
+
+export function filterListingsByIntent(
+  listings: readonly OfficialCourseListing[],
+  intent: ResolvedSearchIntent
+): OfficialCourseListing[] {
+  return listings.filter((listing) => listingMatchesIntent(listing, intent));
+}
+
+export function refineAolListingPage(
+  page: AolListingPage,
+  intent: ResolvedSearchIntent
+): AolListingPage {
+  const listings = filterListingsByIntent(page.listings, intent);
+  if (listings.length === page.listings.length) return { ...page, listings };
+  return { listings, total: listings.length };
+}
+
+function listingMatchesIntent(
+  listing: OfficialCourseListing,
+  intent: ResolvedSearchIntent
+): boolean {
+  return (
+    teacherMatchesIntent(listing.teachers, intent.teacher) &&
+    languageMatchesIntent(listing.languages, intent.language) &&
+    deliveryMatchesIntent(listing.isOnline, intent.deliveryMode)
+  );
+}
+
+function teacherMatchesIntent(
+  teachers: readonly string[],
+  teacher?: string
+): boolean {
+  const needle = teacher?.trim().toLowerCase();
+  if (!needle) return true;
+  if (!teachers.length) return true;
+  return teachers.some((name) => {
+    const hay = name.trim().toLowerCase();
+    return hay === needle || hay.includes(needle);
+  });
+}
+
+function languageMatchesIntent(
+  languages: readonly string[],
+  language?: string
+): boolean {
+  const needle = language?.trim().toLowerCase();
+  if (!needle || !languages.length) return true;
+  return languages.some((item) => item.trim().toLowerCase() === needle);
+}
+
+function deliveryMatchesIntent(
+  isOnline: boolean,
+  deliveryMode?: DeliveryMode
+): boolean {
+  if (deliveryMode === 'online') return isOnline;
+  if (deliveryMode === 'in_person') return !isOnline;
+  return true;
 }
 
 function isFiniteDistance(value: number | null): value is number {

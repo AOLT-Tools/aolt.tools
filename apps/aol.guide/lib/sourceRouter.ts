@@ -19,9 +19,7 @@ export function routeSources(intent: ResolvedSearchIntent): SearchSourceId[] {
   const specificAolCourse = Boolean(
     intent.courseCode && intent.courseCode !== 'FOLLOW_UP'
   );
-  const bangalore = /\b(bangalore|bengaluru)\b/i.test(
-    [intent.city, intent.rawQuery].filter(Boolean).join(' ')
-  );
+  const bangalore = /\b(bangalore|bengaluru)\b/i.test(intent.rawQuery);
   const vagueMeditation =
     /\bmeditation\b/i.test(intent.rawQuery) && !specificAolCourse;
 

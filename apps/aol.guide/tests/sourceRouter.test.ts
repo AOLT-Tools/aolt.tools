@@ -26,10 +26,18 @@ describe('source routing', () => {
     expect(routeSources(intent)).toEqual(['aol', 'vvmvp']);
   });
 
-  it('routes programs at Bangalore Ashram to VVMVP', () => {
-    const intent = parseSearchQuery('programs at Bangalore Ashram next weekend', {
-      now
-    });
-    expect(routeSources(intent)).toEqual(['vvmvp']);
+  it('does not treat a Mapbox-selected Bengaluru city as an ashram query', () => {
+    const intent = {
+      ...parseSearchQuery('teacher Alex', { now }),
+      city: 'Bengaluru',
+      latitude: 12.9121,
+      longitude: 77.6446
+    };
+    expect(routeSources(intent)).toEqual(['aol']);
+  });
+
+  it('still routes an explicit Bangalore query to VVMVP', () => {
+    const intent = parseSearchQuery('teacher Alex Bangalore Ashram', { now });
+    expect(routeSources(intent)[0]).toBe('vvmvp');
   });
 });

@@ -183,6 +183,103 @@ describe('official search service', () => {
     expect(aol?.url).not.toContain('ctype=' + FOLLOW_UP_COURSE_TYPE_IDS[0]);
   });
 
+  it('uses Mapbox coordinates for teacher search the same way as other in-person searches', async () => {
+    const requested: string[] = [];
+    const alexFollowUp = sampleAolCourse({
+      title: 'Sudarshan Kriya Follow Up',
+      sao_id: 2001,
+      ctype: FOLLOW_UP_COURSE_TYPE_IDS[0],
+      teachers: ['Alex Kumar']
+    });
+    const otherFollowUp = sampleAolCourse({
+      title: 'Follow Up with Sam',
+      sao_id: 2002,
+      ctype: FOLLOW_UP_COURSE_TYPE_IDS[0],
+      teachers: ['Sam']
+    });
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock([otherFollowUp, alexFollowUp], 2, requested)
+    });
+    const result = await service.search({
+      query: 'teacher Alex',
+      mode: 'in_person',
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446,
+        city: 'Bengaluru',
+        pincode: '560102'
+      }
+    });
+    expect(result.sources.map((source) => source.source)).toEqual(['aol']);
+    expect(result.intent.teacher).toBe('Alex');
+    expect(result.intent.latitude).toBe(12.9121);
+    expect(result.intent.longitude).toBe(77.6446);
+    expect(result.intent.pincode).toBeUndefined();
+    expect(requested[0]).toContain('lat=12.9121');
+    expect(requested[0]).toContain('lng=77.6446');
+    expect(requested[0]).toContain('is_online_event=0');
+    expect(requested[0]).not.toContain('560102');
+    expect(result.sources[0]?.listings?.map((listing) => listing.title)).toEqual([
+      'Sudarshan Kriya Follow Up'
+    ]);
+  });
+
+  it('keeps Mapbox coordinates when Follow Up has no matching teacher', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: sequentialAolListingsFetchMock(
+        [
+          {
+            when: (url) => url.includes('ctype=' + FOLLOW_UP_COURSE_TYPE_IDS[0]),
+            courses: [
+              sampleAolCourse({
+                title: 'Follow Up with Sam',
+                sao_id: 2002,
+                ctype: FOLLOW_UP_COURSE_TYPE_IDS[0],
+                teachers: ['Sam']
+              })
+            ],
+            total: 1
+          },
+          {
+            when: (url) =>
+              url.includes('new-search-course') &&
+              !url.includes('ctype=' + FOLLOW_UP_COURSE_TYPE_IDS[0]),
+            courses: [
+              sampleAolCourse({
+                title: 'Happiness Program',
+                sao_id: 3001,
+                teachers: ['Alex Kumar']
+              })
+            ],
+            total: 1
+          }
+        ],
+        requested
+      )
+    });
+    const result = await service.search({
+      query: 'teacher Alex',
+      mode: 'in_person',
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446,
+        city: 'Bengaluru'
+      }
+    });
+    expect(requested).toHaveLength(2);
+    expect(requested[0]).toContain('lat=12.9121');
+    expect(requested[1]).toContain('lat=12.9121');
+    expect(result.intent.courseCode).toBeUndefined();
+    expect(result.sources[0]?.listings?.[0]?.title).toBe('Happiness Program');
+  });
+
   it('uses the In-person toggle with a Mapbox-selected location', async () => {
     const requested: string[] = [];
     const service = new OfficialSearchService({

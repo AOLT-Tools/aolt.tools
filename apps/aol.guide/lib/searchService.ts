@@ -18,6 +18,7 @@ import type {
 } from './searchIntent.js';
 import {
   fetchAolCourseListings,
+  refineAolListingPage,
   type AolListingPage
 } from './sources/aolListings.js';
 import { aolSearchAdapter, buildAolFilters } from './sources/aolSearchAdapter.js';
@@ -160,14 +161,15 @@ export class OfficialSearchService {
     }
   }
 
-  private fetchAolPage(
+  private async fetchAolPage(
     intent: ResolvedSearchIntent,
     now: Date
   ): Promise<AolListingPage> {
-    return fetchAolCourseListings(buildAolFilters(intent, now), {
+    const page = await fetchAolCourseListings(buildAolFilters(intent, now), {
       fetchImpl: this.options.fetchImpl,
       limit: this.options.aolListingLimit
     });
+    return refineAolListingPage(page, intent);
   }
 }
 

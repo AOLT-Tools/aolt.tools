@@ -14,19 +14,28 @@ const STATIC_EXAMPLES = [
   'HP 560045 Hindi'
 ] as const;
 
+export type SearchSuggestionOptions = {
+  limit?: number;
+  locationLabel?: string;
+};
+
 export function getSearchSuggestions(
   value: string,
-  options: { limit?: number } = {}
+  options: SearchSuggestionOptions = {}
 ): string[] {
   const normalized = normalizeSearchSuggestion(value);
   if (!normalized) return [];
 
-  const pin = typedPincode(value);
+  const hasMapLocation = Boolean(options.locationLabel?.trim());
+  const pin = typedPincode(value) || (hasMapLocation ? '' : PIN_EXAMPLES[0]);
   const candidates = [
     ...pinDistanceSuggestions(value, pin),
-    ...buildTeacherSuggestionCandidates(value, pin),
-    ...buildSuggestionCandidates(pin),
-    ...STATIC_EXAMPLES
+    ...mapDistanceSuggestions(value, hasMapLocation),
+    ...buildTeacherSuggestionCandidates(value, pin, hasMapLocation),
+    ...buildSuggestionCandidates(pin, hasMapLocation),
+    ...(hasMapLocation
+      ? STATIC_EXAMPLES.filter((example) => !/\b[1-9]\d{5}\b/.test(example))
+      : STATIC_EXAMPLES)
   ];
 
   return uniqueByNormalized(candidates)
@@ -65,15 +74,33 @@ function pinDistanceSuggestions(value: string, pin: string): string[] {
   return DISTANCE_KM.map((km) => base + ' within ' + String(km) + 'km');
 }
 
-function buildTeacherSuggestionCandidates(value: string, pin: string): string[] {
+function mapDistanceSuggestions(value: string, hasMapLocation: boolean): string[] {
+  if (!hasMapLocation) return [];
+  const prefix = value
+    .trim()
+    .replace(/\s+within\s+\d*\s*k?m?s?$/i, '')
+    .replace(/\s+/g, ' ');
+  if (!prefix || /\b[1-9]\d{5}\b/.test(prefix)) return [];
+  return DISTANCE_KM.map((km) => prefix + ' within ' + String(km) + 'km');
+}
+
+function buildTeacherSuggestionCandidates(
+  value: string,
+  pin: string,
+  hasMapLocation: boolean
+): string[] {
   const prefix = teacherQueryPrefix(value);
   if (!prefix) return [];
-  const base = withNearPin(prefix, pin);
+  const base = withLocationConstraint(prefix, pin, hasMapLocation);
   const suggestions = [base];
   for (const km of DISTANCE_KM) {
     suggestions.push(base + ' within ' + String(km) + 'km');
   }
-  if (/\b(?:teacher|with|by)\s+\S+/i.test(prefix) && !/\bashram\b/i.test(prefix)) {
+  if (
+    !hasMapLocation &&
+    /\b(?:teacher|with|by)\s+\S+/i.test(prefix) &&
+    !/\bashram\b/i.test(prefix)
+  ) {
     suggestions.push(prefix + ' Bangalore Ashram');
   }
   return suggestions;
@@ -96,35 +123,46 @@ function teacherQueryPrefix(value: string): string | undefined {
   return prefix.replace(/\s+/g, ' ');
 }
 
-function withNearPin(prefix: string, pin: string): string {
+function withLocationConstraint(
+  prefix: string,
+  pin: string,
+  hasMapLocation: boolean
+): string {
   if (/\b[1-9]\d{5}\b/.test(prefix)) {
     return /\bnear\b/i.test(prefix)
       ? prefix
       : prefix.replace(/\b[1-9]\d{5}\b/, 'near $&').replace(/\s+/g, ' ');
   }
+  if (hasMapLocation) return prefix;
+  if (!pin) return prefix;
   if (/\bnear\b/i.test(prefix)) return prefix + ' ' + pin;
   return prefix + ' near ' + pin;
 }
 
-function buildSuggestionCandidates(pin: string): string[] {
+function buildSuggestionCandidates(pin: string, hasMapLocation: boolean): string[] {
   const suggestions: string[] = [];
   for (const alias of COURSE_ALIASES) {
     if (alias.code === 'FOLLOW_UP') continue;
     for (const base of [alias.code, alias.label]) {
-      suggestions.push(base + ' near ' + pin);
-      suggestions.push(base + ' near ' + pin + ' within 10km');
+      if (hasMapLocation) {
+        suggestions.push(base + ' within 10km');
+      } else if (pin) {
+        suggestions.push(base + ' near ' + pin);
+        suggestions.push(base + ' near ' + pin + ' within 10km');
+      }
       suggestions.push(base + ' online');
     }
   }
   suggestions.push('AMP Bangalore Ashram next weekend');
   suggestions.push('Rudra Puja this weekend');
   suggestions.push('Rudra Puja next week');
-  suggestions.push('Intuition near ' + pin);
+  if (hasMapLocation) suggestions.push('Intuition within 10km');
+  else if (pin) suggestions.push('Intuition near ' + pin);
   return suggestions;
 }
 
 function typedPincode(value: string): string {
-  return value.match(/\b[1-9]\d{5}\b/)?.[0] || pinFromPrefix(value) || PIN_EXAMPLES[0];
+  return value.match(/\b[1-9]\d{5}\b/)?.[0] || pinFromPrefix(value) || '';
 }
 
 function pinFromPrefix(value: string): string {
