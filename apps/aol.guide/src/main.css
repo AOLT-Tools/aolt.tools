@@ -22,11 +22,11 @@
   }
 
   .filter-slot {
-    @apply min-w-0 flex-1;
+    @apply relative z-20 min-w-0 flex-1 overflow-visible;
   }
 
   .filter-control {
-    @apply flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pr-1 pl-2;
+    @apply relative flex h-8 items-center gap-1 overflow-visible rounded-full border border-slate-200 bg-slate-50 pr-1 pl-2;
   }
 
   .filter-control[hidden] {
@@ -54,6 +54,8 @@
     display: block;
     width: 100%;
     min-width: 0;
+    position: relative;
+    z-index: 30;
   }
 
   .search-chip {

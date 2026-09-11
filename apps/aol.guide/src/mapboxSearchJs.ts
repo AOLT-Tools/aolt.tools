@@ -2,7 +2,10 @@ export type MapboxSearchBoxElement = HTMLElement & {
   accessToken: string;
   placeholder: string;
   options: Record<string, unknown>;
-  theme?: { variables?: Record<string, string> };
+  theme?: {
+    variables?: Record<string, string>;
+    cssText?: string;
+  };
 };
 
 export type MapboxSearchJs = {

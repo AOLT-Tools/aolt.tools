@@ -589,13 +589,24 @@ async function mountMapboxSearchBox() {
       variables: {
         fontFamily: 'inherit',
         unit: '13px',
-        padding: '0.15em',
-        border: 'none',
-        borderRadius: '0',
-        boxShadow: 'none',
-        colorBackground: 'transparent',
-        minWidth: '0'
-      }
+        padding: '0.5em 0.75em',
+        border: '1px solid #e2e8f0',
+        borderRadius: '12px',
+        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.16)',
+        colorBackground: '#ffffff',
+        colorBackgroundHover: '#fff7ed',
+        colorText: '#0f172a',
+        colorSecondary: '#475569',
+        minWidth: 'min(18rem, calc(100vw - 2rem))'
+      },
+      cssText: [
+        '.SearchBox{background:transparent;border:none;box-shadow:none;border-radius:0;min-width:0;width:100%;}',
+        '.Input{background:transparent;color:#0f172a;padding:0.15em;}',
+        '.Results,.ResultsList,.Suggestion{background:#ffffff;opacity:1;}',
+        '.Results{color:#0f172a;}',
+        '.SuggestionName,.SuggestionText,.Label{color:#0f172a;}',
+        '.SuggestionDesc{color:#475569;}'
+      ].join('')
     };
     box.addEventListener('retrieve', (event: Event) => {
       selectedLocation = locationFromMapboxRetrieve((event as CustomEvent).detail);
