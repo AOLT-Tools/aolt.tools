@@ -120,6 +120,11 @@ export function buildAolFilters(
   if (hasCoordinates) {
     filters.lat = String(intent.latitude);
     filters.lng = String(intent.longitude);
+    if (intent.pincode) filters.selectedLocName = intent.pincode;
+    else if (intent.city) filters.selectedLocName = intent.city;
+  } else {
+    const locationName = intent.pincode || intent.city;
+    if (locationName) filters.selectedLocName = locationName;
   }
   if (typeof intent.radiusKm === 'number') {
     filters.distance = String(Math.round(intent.radiusKm));
@@ -127,9 +132,6 @@ export function buildAolFilters(
   if (dateFrom === today && !intent.startTimeFrom && !intent.startTimeTo) {
     filters.current_day_time_from = currentDayTimeFrom(now);
   }
-
-  const locationName = intent.pincode || intent.city;
-  if (locationName) filters.selectedLocName = locationName;
 
   return filters;
 }
@@ -142,11 +144,19 @@ function visibleAolFilters(
   const alias = intent.courseCode
     ? findCourseAliasByCode(intent.courseCode)
     : undefined;
+  const hasCoordinates =
+    typeof intent.latitude === 'number' && typeof intent.longitude === 'number';
   if (alias) visible.course = alias.label;
   else if (filters.ctype) visible.ctype = filters.ctype;
   if (intent.teacher) visible.teacher = intent.teacher;
-  if (intent.pincode) visible.pincode = intent.pincode;
-  if (intent.city && !intent.pincode) visible.city = intent.city;
+  if (hasCoordinates) {
+    if (intent.pincode) visible.pincode = intent.pincode;
+    else if (intent.city) visible.city = intent.city;
+  } else if (intent.pincode) {
+    visible.pincode = intent.pincode;
+  } else if (intent.city) {
+    visible.city = intent.city;
+  }
   if (filters.distance) visible.distance = filters.distance + ' km';
   if (intent.language) visible.language = intent.language;
   if (intent.dateLabel) visible.dates = intent.dateLabel;

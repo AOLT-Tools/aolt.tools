@@ -1,9 +1,23 @@
 import { z } from 'zod';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createOfficialSearchService } from '../lib/factory.js';
+import { parseSearchMode, parseDatePreset } from '../lib/searchRequest.js';
 
 const SearchBodySchema = z.object({
-  query: z.string().trim().min(1)
+  query: z.string().trim().min(1),
+  mode: z.enum(['in_person', 'online']).optional(),
+  datePreset: z
+    .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days'])
+    .optional(),
+  location: z
+    .object({
+      label: z.string().trim().min(1).max(256),
+      latitude: z.number(),
+      longitude: z.number(),
+      pincode: z.string().trim().max(12).optional(),
+      city: z.string().trim().max(80).optional()
+    })
+    .optional()
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -17,7 +31,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = SearchBodySchema.parse(readBody(req));
-    const result = await createOfficialSearchService().search(body.query);
+    const result = await createOfficialSearchService().search({
+      query: body.query,
+      mode: parseSearchMode(body.mode),
+      datePreset: parseDatePreset(body.datePreset),
+      location: body.location
+    });
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({
       success: true,

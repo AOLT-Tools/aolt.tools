@@ -153,11 +153,11 @@ export function sortListingsByDistance(
   listings: readonly OfficialCourseListing[]
 ): OfficialCourseListing[] {
   return [...listings].sort((left, right) => {
-    const leftKnown = isFiniteDistance(left.distanceKm);
-    const rightKnown = isFiniteDistance(right.distanceKm);
-    if (leftKnown && rightKnown) return left.distanceKm - right.distanceKm;
-    if (leftKnown) return -1;
-    if (rightKnown) return 1;
+    if (isFiniteDistance(left.distanceKm) && isFiniteDistance(right.distanceKm)) {
+      return left.distanceKm - right.distanceKm;
+    }
+    if (isFiniteDistance(left.distanceKm)) return -1;
+    if (isFiniteDistance(right.distanceKm)) return 1;
     return 0;
   });
 }

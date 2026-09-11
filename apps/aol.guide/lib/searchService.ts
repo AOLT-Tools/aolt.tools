@@ -1,7 +1,12 @@
+import { isValidLatitude, isValidLongitude } from '@aolt/core/geo';
 import {
   FOLLOW_UP_COURSE_TYPE_IDS,
   findCourseAliasByCode
 } from './courseAliases.js';
+import {
+  resolveOnlineTimePreset,
+  type OnlineTimePreset
+} from './dateRanges.js';
 import {
   isDeterministicParseComplete,
   parseSearchQuery
@@ -20,6 +25,23 @@ import { routeSources, SEARCH_SOURCE_ADAPTERS } from './sourceRouter.js';
 
 export type IntentParser = {
   parse(query: string): Promise<ResolvedSearchIntent | null>;
+};
+
+export type SearchMode = 'in_person' | 'online';
+
+export type SelectedSearchLocation = {
+  label: string;
+  latitude: number;
+  longitude: number;
+  pincode?: string;
+  city?: string;
+};
+
+export type OfficialSearchRequest = {
+  query: string;
+  mode?: SearchMode;
+  location?: SelectedSearchLocation;
+  datePreset?: OnlineTimePreset;
 };
 
 export type OfficialSearchServiceOptions = {
@@ -42,8 +64,11 @@ export type OfficialSearchResponse = {
 export class OfficialSearchService {
   constructor(private readonly options: OfficialSearchServiceOptions) {}
 
-  async search(query: string): Promise<OfficialSearchResponse> {
-    const trimmed = query.trim();
+  async search(
+    input: string | OfficialSearchRequest
+  ): Promise<OfficialSearchResponse> {
+    const request = normalizeSearchRequest(input);
+    const trimmed = request.query;
     const now = this.options.now || new Date();
     let intent = parseSearchQuery(trimmed, { now });
     let usedGemini = false;
@@ -56,7 +81,13 @@ export class OfficialSearchService {
       }
     }
 
-    intent = await resolvePincodeCoordinates(intent, this.options.pincodeResolver);
+    intent = applySearchControls(intent, request, now);
+    if (
+      request.mode !== 'online' &&
+      (typeof intent.latitude !== 'number' || typeof intent.longitude !== 'number')
+    ) {
+      intent = await resolvePincodeCoordinates(intent, this.options.pincodeResolver);
+    }
 
     const sourceIds = routeSources(intent);
     const adapters = sourceIds
@@ -84,7 +115,7 @@ export class OfficialSearchService {
     return {
       query: trimmed,
       intent: displayIntent,
-      interpretation: describeIntent(displayIntent),
+      interpretation: describeIntent(displayIntent, request.location),
       sources,
       usedGemini,
       messages
@@ -221,7 +252,8 @@ export async function resolvePincodeCoordinates(
 }
 
 export function describeIntent(
-  intent: ResolvedSearchIntent
+  intent: ResolvedSearchIntent,
+  location?: SelectedSearchLocation
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (intent.courseLabel || intent.courseCode) {
@@ -242,10 +274,13 @@ export function describeIntent(
   } else if (intent.keywords?.length) {
     rows.push({ label: 'Looking for', value: intent.keywords.join(' ') });
   }
-  if (intent.pincode) rows.push({ label: 'Near', value: intent.pincode });
-  else if (intent.city) rows.push({ label: 'Near', value: intent.city });
-  if (typeof intent.radiusKm === 'number') {
-    rows.push({ label: 'Within', value: String(intent.radiusKm) + ' km' });
+  if (intent.deliveryMode !== 'online') {
+    if (intent.pincode) rows.push({ label: 'Near', value: intent.pincode });
+    else if (location) rows.push({ label: 'Near', value: location.label });
+    else if (intent.city) rows.push({ label: 'Near', value: intent.city });
+    if (typeof intent.radiusKm === 'number') {
+      rows.push({ label: 'Within', value: String(intent.radiusKm) + ' km' });
+    }
   }
   if (intent.language) rows.push({ label: 'Language', value: intent.language });
   if (intent.deliveryMode && intent.deliveryMode !== 'any') {
@@ -267,4 +302,59 @@ export function describeIntent(
 
 function titleCase(value: string): string {
   return value.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function normalizeSearchRequest(
+  input: string | OfficialSearchRequest
+): OfficialSearchRequest {
+  if (typeof input === 'string') {
+    return { query: input.trim() };
+  }
+  return {
+    query: input.query.trim(),
+    mode: input.mode,
+    location: input.location,
+    datePreset: input.datePreset
+  };
+}
+
+export function applySearchControls(
+  intent: ResolvedSearchIntent,
+  request: OfficialSearchRequest,
+  now: Date
+): ResolvedSearchIntent {
+  if (request.mode === 'online') {
+    const range = resolveOnlineTimePreset(request.datePreset, now);
+    const anytime = request.datePreset === 'anytime';
+    return {
+      ...intent,
+      deliveryMode: 'online',
+      latitude: undefined,
+      longitude: undefined,
+      radiusKm: undefined,
+      dateFrom: anytime ? undefined : range?.start || intent.dateFrom,
+      dateTo: anytime ? undefined : range?.end || intent.dateTo,
+      dateLabel: anytime ? undefined : range?.label || intent.dateLabel
+    };
+  }
+  if (request.mode !== 'in_person') return intent;
+
+  let next: ResolvedSearchIntent = { ...intent, deliveryMode: 'in_person' };
+  const location = request.location;
+  if (
+    location &&
+    isValidLatitude(location.latitude) &&
+    isValidLongitude(location.longitude)
+  ) {
+    next = {
+      ...next,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      city: location.city || location.label,
+      pincode: undefined,
+      pincodeResolved: true,
+      radiusKm: typeof next.radiusKm === 'number' ? next.radiusKm : 10
+    };
+  }
+  return next;
 }

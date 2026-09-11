@@ -182,4 +182,83 @@ describe('official search service', () => {
     expect(aol?.listings?.[0]?.title).toBe('Happiness Program');
     expect(aol?.url).not.toContain('ctype=' + FOLLOW_UP_COURSE_TYPE_IDS[0]);
   });
+
+  it('uses the In-person toggle with a Mapbox-selected location', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock([sampleAolCourse()], 1, requested)
+    });
+    const result = await service.search({
+      query: 'HP this weekend',
+      mode: 'in_person',
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446,
+        city: 'Bengaluru',
+        pincode: '560102'
+      }
+    });
+    expect(result.intent.deliveryMode).toBe('in_person');
+    expect(result.intent.latitude).toBe(12.9121);
+    expect(result.intent.longitude).toBe(77.6446);
+    expect(result.intent.pincode).toBeUndefined();
+    expect(requested[0]).toContain('lat=12.9121');
+    expect(requested[0]).toContain('lng=77.6446');
+    expect(requested[0]).not.toContain('560102');
+    expect(requested[0]).toContain('is_online_event=0');
+    expect(requested[0]).toContain('distance=10');
+    expect(result.sources[0]?.url).toContain('lat=12.9121');
+    expect(result.sources[0]?.url).toContain('lng=77.6446');
+    expect(result.sources[0]?.url).toContain('selectedLocName=Bengaluru');
+    expect(result.sources[0]?.url).not.toContain('selectedLocName=560102');
+    expect(result.sources[0]?.url).not.toContain('560102');
+  });
+
+  it('uses the Online toggle and ignores location coordinates', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock(
+        [sampleAolCourse({ is_online_event: 1, dist: undefined })],
+        1,
+        requested
+      )
+    });
+    const result = await service.search({
+      query: 'HP this weekend',
+      mode: 'online',
+      datePreset: 'anytime',
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446
+      }
+    });
+    expect(result.intent.deliveryMode).toBe('online');
+    expect(result.intent.dateLabel).toBeUndefined();
+    expect(requested[0]).toContain('is_online_event=1');
+    expect(requested[0]).not.toContain('lat=');
+  });
+
+  it('applies the Online time selector over query dates', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock([sampleAolCourse()], 1, requested)
+    });
+    const result = await service.search({
+      query: 'HP this weekend',
+      mode: 'online',
+      datePreset: 'today'
+    });
+    expect(result.intent.dateLabel).toBe('Today');
+    expect(result.intent.dateFrom).toBe('2026-09-04');
+    expect(requested[0]).toContain('start_date_from=2026-09-04');
+    expect(requested[0]).toContain('start_date_to=2026-09-04');
+  });
 });

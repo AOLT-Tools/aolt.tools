@@ -5,6 +5,57 @@
     @apply inline-flex min-h-7 items-center rounded-full bg-slate-100 px-2.5 text-[11px] font-semibold text-slate-600;
   }
 
+  .filter-bar {
+    @apply mt-1.5 flex items-center gap-1.5;
+  }
+
+  .mode-toggle {
+    @apply grid shrink-0 grid-cols-2 rounded-full bg-slate-100 p-0.5;
+  }
+
+  .mode-option {
+    @apply h-8 cursor-pointer rounded-full border-0 bg-transparent px-2.5 text-[11px] font-semibold whitespace-nowrap text-slate-600;
+  }
+
+  .mode-option[aria-checked='true'] {
+    @apply bg-white text-[#1b3a6e] shadow-sm;
+  }
+
+  .filter-slot {
+    @apply min-w-0 flex-1;
+  }
+
+  .filter-control {
+    @apply flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pr-1 pl-2;
+  }
+
+  .filter-control[hidden] {
+    display: none !important;
+  }
+
+  .filter-icon {
+    @apply shrink-0 text-[13px] leading-none;
+  }
+
+  .filter-control-body {
+    @apply min-w-0 flex-1;
+  }
+
+  .filter-input,
+  .filter-select {
+    @apply h-8 w-full min-w-0 border-0 bg-transparent pr-2 text-[13px] text-slate-900 outline-none;
+  }
+
+  .filter-select {
+    @apply cursor-pointer appearance-none bg-transparent;
+  }
+
+  .filter-control-body mapbox-search-box {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
   .search-chip {
     @apply inline-flex min-h-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[13px] font-semibold whitespace-nowrap text-slate-700;
   }

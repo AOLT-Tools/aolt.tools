@@ -1,4 +1,17 @@
 import { getSearchSuggestions } from './searchSuggestions.js';
+import {
+  loadMapboxSearchJs,
+  locationFromMapboxRetrieve,
+  type BrowserLocation
+} from './mapboxSearchJs.js';
+
+type SearchMode = 'in_person' | 'online';
+type TimePreset =
+  | 'anytime'
+  | 'today'
+  | 'tomorrow'
+  | 'this_weekend'
+  | 'next_7_days';
 
 type InterpretationRow = {
   label: string;
@@ -47,6 +60,9 @@ type SearchResponse = {
   error?: { message?: string };
 };
 
+const MODE_STORAGE_KEY = 'aol-guide-search-mode';
+const TIME_STORAGE_KEY = 'aol-guide-online-time';
+
 const searchForm = document.querySelector<HTMLFormElement>('#search-form');
 const searchInput = document.querySelector<HTMLInputElement>('#query');
 const searchSuggestions = document.querySelector<HTMLElement>('#search-suggestions');
@@ -56,6 +72,15 @@ const summaryStrip = document.querySelector<HTMLElement>('#summary-strip');
 const exampleActions = document.querySelectorAll<HTMLElement>(
   '.example-links [data-query]'
 );
+const modeToggle = document.querySelector<HTMLElement>('#search-mode');
+const locationControl = document.querySelector<HTMLElement>('#location-control');
+const locationHost = document.querySelector<HTMLElement>('#location-host');
+const timeControl = document.querySelector<HTMLElement>('#time-control');
+const timeSelect = document.querySelector<HTMLSelectElement>('#time-preset');
+
+let currentMode: SearchMode = readStoredMode();
+let currentTimePreset: TimePreset = readStoredTime();
+let selectedLocation: BrowserLocation | undefined;
 
 let activeSuggestionIndex = -1;
 let renderedSuggestions: string[] = [];
@@ -68,6 +93,10 @@ function initializeSearchPage() {
   }
 
   setStatus('');
+  renderModeToggle();
+  syncFilterSlot();
+  if (timeSelect) timeSelect.value = currentTimePreset;
+  void mountMapboxSearchBox();
 
   searchForm.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -98,6 +127,26 @@ function initializeSearchPage() {
       event.preventDefault();
       fillSearchInput(button.dataset.query || '');
     });
+  });
+
+  modeToggle?.addEventListener('click', (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest('[data-mode]') : null;
+    const mode = button instanceof HTMLElement ? parseMode(button.dataset.mode) : undefined;
+    if (!mode || mode === currentMode) return;
+    currentMode = mode;
+    persistMode(mode);
+    renderModeToggle();
+    syncFilterSlot();
+    if (searchInput.value.trim()) void runSearch(searchInput.value);
+  });
+
+  timeSelect?.addEventListener('change', () => {
+    currentTimePreset = parseTimePreset(timeSelect.value) || 'anytime';
+    persistTime(currentTimePreset);
+    if (currentMode === 'online' && searchInput?.value.trim()) {
+      void runSearch(searchInput.value);
+    }
   });
 }
 
@@ -286,7 +335,12 @@ async function fetchSearch(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     signal,
-    body: JSON.stringify({ query })
+    body: JSON.stringify({
+      query,
+      mode: currentMode,
+      datePreset: currentMode === 'online' ? currentTimePreset : undefined,
+      location: currentMode === 'in_person' ? searchLocationCoords(selectedLocation) : undefined
+    })
   });
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
@@ -399,33 +453,37 @@ function moreResultsLink(url: string): HTMLAnchorElement {
 function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const card = document.createElement('article');
   card.className = 'result-card';
+  const online = currentMode === 'online' || item.isOnline;
 
   const header = document.createElement('header');
   const title = document.createElement('h2');
   title.textContent = item.title;
   header.append(title);
-  if (item.isOnline) {
+  if (online) {
     const labels = document.createElement('div');
     labels.className = 'result-card-labels';
-    const online = document.createElement('span');
-    online.className = 'badge online-badge';
-    online.textContent = 'Online';
-    labels.append(online);
+    const badge = document.createElement('span');
+    badge.className = 'badge online-badge';
+    badge.textContent = 'Online';
+    labels.append(badge);
     header.append(labels);
   }
 
   const meta = document.createElement('div');
   meta.className = 'result-meta';
   appendMetaRow(meta, 'calendar', item.schedule);
-  appendMetaRow(meta, 'location', item.location);
+  if (!online) appendMetaRow(meta, 'location', item.location);
 
   const secondary = document.createElement('div');
   secondary.className = 'result-meta-secondary';
-  for (const part of [
-    typeof item.distanceKm === 'number' ? item.distanceKm.toFixed(1) + ' km' : '',
-    item.languages.join(', '),
-    item.fee
-  ].filter(Boolean)) {
+  const secondaryParts = online
+    ? [item.languages.join(', '), item.fee]
+    : [
+        typeof item.distanceKm === 'number' ? item.distanceKm.toFixed(1) + ' km' : '',
+        item.languages.join(', '),
+        item.fee
+      ];
+  for (const part of secondaryParts.filter(Boolean)) {
     const span = document.createElement('span');
     span.textContent = part;
     secondary.append(span);
@@ -497,4 +555,111 @@ function emptyNode(label: string): HTMLElement {
   empty.className = 'empty';
   empty.textContent = label;
   return empty;
+}
+
+function renderModeToggle() {
+  modeToggle?.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
+    button.setAttribute('aria-checked', String(button.dataset.mode === currentMode));
+  });
+}
+
+function syncFilterSlot() {
+  const inPerson = currentMode === 'in_person';
+  if (locationControl) locationControl.hidden = !inPerson;
+  if (timeControl) timeControl.hidden = inPerson;
+}
+
+async function mountMapboxSearchBox() {
+  if (!locationHost) return;
+  const token = (import.meta.env.AOL_GUIDE_MAPBOX_TOKEN || '').trim();
+  const fallback = locationHost.querySelector<HTMLInputElement>('#location-fallback');
+  if (!token.startsWith('pk.')) {
+    if (fallback) fallback.placeholder = 'Mapbox token missing';
+    return;
+  }
+  try {
+    const searchJs = await loadMapboxSearchJs();
+    const box = new searchJs.MapboxSearchBox();
+    box.accessToken = token;
+    box.placeholder = 'Location';
+    box.options = { language: 'en', country: 'IN' };
+    box.theme = {
+      variables: {
+        fontFamily: 'inherit',
+        unit: '13px',
+        padding: '0.15em',
+        border: 'none',
+        borderRadius: '0',
+        boxShadow: 'none',
+        colorBackground: 'transparent',
+        minWidth: '0'
+      }
+    };
+    box.addEventListener('retrieve', (event: Event) => {
+      selectedLocation = locationFromMapboxRetrieve((event as CustomEvent).detail);
+      if (searchInput?.value.trim()) void runSearch(searchInput.value);
+    });
+    box.addEventListener('clear', () => {
+      selectedLocation = undefined;
+    });
+    locationHost.replaceChildren(box);
+  } catch {
+    if (fallback) fallback.placeholder = 'Location unavailable';
+  }
+}
+
+function searchLocationCoords(location: BrowserLocation | undefined) {
+  if (!location) return undefined;
+  return {
+    label: location.label,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    city: location.city
+  };
+}
+
+function parseMode(value: string | undefined): SearchMode | undefined {
+  return value === 'online' || value === 'in_person' ? value : undefined;
+}
+
+function parseTimePreset(value: string | undefined): TimePreset | undefined {
+  return value === 'anytime' ||
+    value === 'today' ||
+    value === 'tomorrow' ||
+    value === 'this_weekend' ||
+    value === 'next_7_days'
+    ? value
+    : undefined;
+}
+
+function readStoredMode(): SearchMode {
+  try {
+    return parseMode(localStorage.getItem(MODE_STORAGE_KEY) || '') || 'in_person';
+  } catch {
+    return 'in_person';
+  }
+}
+
+function persistMode(mode: SearchMode) {
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, mode);
+  } catch {
+    // Ignore storage failures; the selected mode still applies for this visit.
+  }
+}
+
+function readStoredTime(): TimePreset {
+  try {
+    return parseTimePreset(localStorage.getItem(TIME_STORAGE_KEY) || '') || 'anytime';
+  } catch {
+    return 'anytime';
+  }
+}
+
+function persistTime(preset: TimePreset) {
+  try {
+    localStorage.setItem(TIME_STORAGE_KEY, preset);
+  } catch {
+    // Ignore storage failures; the selected range still applies for this visit.
+  }
 }

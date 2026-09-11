@@ -1,7 +1,10 @@
 import {
+  addCalendarDays,
   daysInMonth,
   indiaDateParts,
   isoDate,
+  resolveDatePreset,
+  todayInIndia,
   type DatePreset,
   type DateRange
 } from '@aolt/core/dates';
@@ -36,6 +39,29 @@ export const MONTH_PATTERN = MONTHS.flatMap((month) => month.aliases)
   .sort((left, right) => right.length - left.length)
   .map(escapeRegExp)
   .join('|');
+
+export type OnlineTimePreset =
+  | 'anytime'
+  | 'today'
+  | 'tomorrow'
+  | 'this_weekend'
+  | 'next_7_days';
+
+export function resolveOnlineTimePreset(
+  preset: OnlineTimePreset | undefined,
+  now = new Date()
+): DateRange | undefined {
+  if (!preset || preset === 'anytime') return undefined;
+  if (preset === 'next_7_days') {
+    const start = todayInIndia(now);
+    return {
+      start,
+      end: addCalendarDays(start, 6),
+      label: 'Next 7 days'
+    };
+  }
+  return resolveDatePreset(preset, now);
+}
 
 export function detectDatePreset(normalized: string): DatePreset | undefined {
   if (/\bnext\s+weekend\b/i.test(normalized)) return 'next_weekend';

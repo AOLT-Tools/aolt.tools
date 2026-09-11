@@ -1,14 +1,23 @@
 import { resolve } from 'node:path';
 import type { IncomingMessage, ServerResponse as NodeResponse } from 'node:http';
+import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import tailwindcss from '@tailwindcss/vite';
 
 const appDir = import.meta.dirname;
 const repoDir = resolve(appDir, '../..');
 
-export default defineConfig({
-  root: resolve(appDir, 'src'),
-  publicDir: resolve(appDir, 'public'),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, appDir, '');
+  return {
+    root: resolve(appDir, 'src'),
+    publicDir: resolve(appDir, 'public'),
+    envDir: appDir,
+    define: {
+      'import.meta.env.AOL_GUIDE_MAPBOX_TOKEN': JSON.stringify(
+        env.AOL_GUIDE_MAPBOX_TOKEN || ''
+      )
+    },
   plugins: [
     tailwindcss(),
     {
@@ -31,7 +40,8 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(appDir, 'src/index.html')
+        main: resolve(appDir, 'src/index.html'),
+        mapboxAutofill: resolve(appDir, 'src/mapbox-autofill.html')
       },
       output: {
         entryFileNames: 'assets/aol-guide/[name]-[hash].js',
@@ -45,6 +55,7 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     environment: 'node'
   }
+};
 });
 
 function attachSearchApi(server: {
@@ -79,7 +90,15 @@ function attachSearchApi(server: {
         return;
       }
       const { createOfficialSearchService } = await import('./lib/factory.ts');
-      const result = await createOfficialSearchService().search(query);
+      const { parseSearchMode, parseDatePreset, readLocation } = await import(
+        './lib/searchRequest.ts'
+      );
+      const result = await createOfficialSearchService().search({
+        query,
+        mode: parseSearchMode(body.mode),
+        datePreset: parseDatePreset(body.datePreset),
+        location: readLocation(body.location)
+      });
       res.statusCode = 200;
       res.setHeader('content-type', 'application/json');
       res.setHeader('cache-control', 'no-store');

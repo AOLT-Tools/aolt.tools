@@ -107,6 +107,62 @@
           </div>
         </form>
 
+        <div class="filter-bar">
+          <div
+            class="mode-toggle"
+            id="search-mode"
+            role="radiogroup"
+            aria-label="Course mode"
+          >
+            <button
+              type="button"
+              class="mode-option"
+              role="radio"
+              aria-checked="true"
+              data-mode="in_person"
+            >
+              In-person
+            </button>
+            <button
+              type="button"
+              class="mode-option"
+              role="radio"
+              aria-checked="false"
+              data-mode="online"
+            >
+              Online
+            </button>
+          </div>
+
+          <div class="filter-slot" id="filter-slot">
+            <div class="filter-control" id="location-control">
+              <span class="filter-icon" aria-hidden="true">📍</span>
+              <div class="filter-control-body" id="location-host">
+                <input
+                  id="location-fallback"
+                  class="filter-input"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Location"
+                  disabled
+                />
+              </div>
+            </div>
+
+            <div class="filter-control" id="time-control" hidden>
+              <span class="filter-icon" aria-hidden="true">🕐</span>
+              <label for="time-preset" class="sr-only">Course dates</label>
+              <select id="time-preset" class="filter-select">
+                <option value="anytime">Anytime</option>
+                <option value="today">Today</option>
+                <option value="tomorrow">Tomorrow</option>
+                <option value="this_weekend">This weekend</option>
+                <option value="next_7_days">Next 7 days</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <div
           class="example-links -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Quick searches"
