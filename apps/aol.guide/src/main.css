@@ -5,6 +5,10 @@
     @apply inline-flex min-h-7 items-center rounded-full bg-slate-100 px-2.5 text-[11px] font-semibold text-slate-600;
   }
 
+  .feedback-link {
+    @apply inline-flex min-h-8 shrink-0 items-center rounded-full bg-[#25D366]/15 px-3 text-[13px] font-semibold text-[#128C7E] no-underline;
+  }
+
   .filter-bar {
     @apply mt-0 flex flex-nowrap items-center gap-1.5;
   }
