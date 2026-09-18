@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   COURSE_FILTER_ORDER,
   categorizeCourse,
+  courseCategoryLabel,
   nextAolRadiusKm,
   parseCourseCategories,
   presentCourseCategories,
@@ -52,6 +53,23 @@ describe('course categories', () => {
       categorizeCourse({ courseTypeId: '55116', title: 'Volunteer Training Program' })
     ).toBe('advanced');
     expect(categorizeCourse({ courseTypeId: '22119', title: 'AMP' })).toBe('advanced');
+  });
+
+  it('maps Follow Up and Satsang into Regular Connects', () => {
+    expect(COURSE_FILTER_ORDER).toContain('regular_connects');
+    expect(COURSE_FILTER_ORDER).not.toContain('follow_up');
+    expect(courseCategoryLabel('regular_connects')).toBe('Regular Connects');
+    expect(
+      categorizeCourse({
+        courseTypeId: '351956',
+        title: 'Sudarshan Kriya Follow Up'
+      })
+    ).toBe('regular_connects');
+    expect(categorizeCourse({ title: 'Weekly Satsang' })).toBe('regular_connects');
+    expect(parseCourseCategories('follow_up,beginner')).toEqual([
+      'beginner',
+      'regular_connects'
+    ]);
   });
 
   it('expands the in-person radius ladder from 3 km', () => {

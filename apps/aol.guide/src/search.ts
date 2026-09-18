@@ -8,6 +8,7 @@ import {
   serializeCourseCategories,
   type CourseCategoryId
 } from '../lib/courseCategories.js';
+import { vvmvpCategoryLabel } from '../lib/sources/vvmvpListings.js';
 import {
   loadMapboxSearchJs,
   locationFromMapboxRetrieve,
@@ -52,6 +53,7 @@ type SourceSearchResult = {
   listings?: OfficialCourseListing[];
   listingTotal?: number;
   listingError?: string;
+  listingCategories?: string[];
 };
 
 type SearchResponse = {
@@ -65,6 +67,7 @@ const SOURCE_STORAGE_KEY = 'aol-guide-search-source';
 const MODE_STORAGE_KEY = 'aol-guide-search-mode';
 const TIME_STORAGE_KEY = 'aol-guide-online-time';
 const CATEGORY_STORAGE_KEY = 'aol-guide-course-category';
+const ASHRAM_CATEGORY_STORAGE_KEY = 'aol-guide-ashram-category';
 const FIRST_RADIUS_KM = 3;
 
 const results = document.querySelector<HTMLElement>('#results');
@@ -82,6 +85,8 @@ let currentSource: SearchSource = readStoredSource();
 let currentMode: SearchMode = readStoredMode();
 let currentTimePreset: TimePreset = readStoredTime();
 let selectedCategories = new Set<CourseCategoryId>(readStoredCategories());
+let selectedAshramCategory = readStoredAshramCategory();
+let ashramCategories: string[] = [];
 let selectedLocation: BrowserLocation | undefined;
 let currentRadiusKm = FIRST_RADIUS_KM;
 let mergedListings: OfficialCourseListing[] = [];
@@ -139,10 +144,17 @@ function initializeSearchPage() {
   categoryChips?.addEventListener('click', (event) => {
     const button =
       event.target instanceof Element ? event.target.closest('[data-category]') : null;
-    const category =
-      button instanceof HTMLElement
-        ? parseCourseFilter(button.dataset.category)
-        : undefined;
+    const raw = button instanceof HTMLElement ? button.dataset.category : undefined;
+    if (!raw) return;
+    if (currentSource === 'vvmvp') {
+      if (raw === selectedAshramCategory) return;
+      selectedAshramCategory = raw;
+      persistAshramCategory();
+      renderCategoryChips();
+      renderMergedResults();
+      return;
+    }
+    const category = parseCourseFilter(raw);
     if (!category) return;
     if (selectedCategories.has(category)) selectedCategories.delete(category);
     else selectedCategories.add(category);
@@ -161,7 +173,10 @@ function syncControls() {
   if (timeControl) timeControl.hidden = !online;
   const filterSlot = document.querySelector<HTMLElement>('#filter-slot');
   if (filterSlot) filterSlot.hidden = !inPerson && !online;
-  if (categoryChips && !courses) categoryChips.hidden = true;
+  if (categoryChips && currentSource === 'vds') {
+    categoryChips.hidden = true;
+    categoryChips.replaceChildren();
+  }
 }
 
 function renderIdleState() {
@@ -218,6 +233,10 @@ async function runCatalogSearch(options: { append?: boolean } = {}) {
     mergedListings = options.append
       ? mergeListings(mergedListings, incoming)
       : incoming;
+    ashramCategories =
+      currentSource === 'vvmvp'
+        ? presentAshramCategories(source?.listingCategories)
+        : [];
     if (source?.listingError && !mergedListings.length) {
       results.replaceChildren(emptyNode(source.listingError));
     } else {
@@ -304,7 +323,17 @@ function listingCategory(item: OfficialCourseListing): CourseCategoryId {
     : 'other';
 }
 
+function ashramCategory(item: OfficialCourseListing): string {
+  return item.category || '';
+}
+
 function visibleListings(): OfficialCourseListing[] {
+  if (currentSource === 'vvmvp') {
+    if (!selectedAshramCategory) return mergedListings;
+    return mergedListings.filter(
+      (item) => ashramCategory(item) === selectedAshramCategory
+    );
+  }
   if (!selectedCategories.size) return mergedListings;
   return mergedListings.filter((item) => selectedCategories.has(listingCategory(item)));
 }
@@ -313,6 +342,20 @@ function presentCategories(): CourseCategoryId[] {
   return presentCourseCategories(
     mergedListings.map((item) => ({ category: listingCategory(item) }))
   );
+}
+
+function presentAshramCategories(order?: string[]): string[] {
+  const present = new Set(
+    mergedListings.map(ashramCategory).filter(Boolean)
+  );
+  const fromServer = (order || []).filter((name) => present.has(name));
+  if (fromServer.length) {
+    for (const name of present) {
+      if (!fromServer.includes(name)) fromServer.push(name);
+    }
+    return fromServer;
+  }
+  return [...present];
 }
 
 function pruneSelectedCategories() {
@@ -327,8 +370,45 @@ function pruneSelectedCategories() {
   persistCategories();
 }
 
+function pruneAshramCategory() {
+  const present = presentAshramCategories(ashramCategories);
+  ashramCategories = present;
+  if (!present.length) {
+    selectedAshramCategory = '';
+    return;
+  }
+  if (!selectedAshramCategory || !present.includes(selectedAshramCategory)) {
+    selectedAshramCategory = present[0];
+  }
+  persistAshramCategory();
+}
+
 function renderCategoryChips() {
   if (!categoryChips) return;
+  if (currentSource === 'vvmvp') {
+    pruneAshramCategory();
+    if (!ashramCategories.length) {
+      categoryChips.hidden = true;
+      categoryChips.replaceChildren();
+      return;
+    }
+    categoryChips.hidden = false;
+    categoryChips.replaceChildren(
+      ...ashramCategories.map((name) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'category-chip';
+        button.dataset.category = name;
+        button.setAttribute(
+          'aria-pressed',
+          String(name === selectedAshramCategory)
+        );
+        button.textContent = vvmvpCategoryLabel(name);
+        return button;
+      })
+    );
+    return;
+  }
   const present = presentCategories();
   if (currentSource !== 'aol' || !present.length) {
     categoryChips.hidden = true;
@@ -354,7 +434,7 @@ function renderMergedResults(source?: SourceSearchResult) {
   if (!results) return;
   renderCategoryChips();
 
-  if (currentSource !== 'aol') {
+  if (currentSource === 'vds') {
     if (source?.listingError) {
       results.replaceChildren(emptyNode(source.listingError));
       return;
@@ -365,9 +445,26 @@ function renderMergedResults(source?: SourceSearchResult) {
     return;
   }
 
+  if (currentSource === 'vvmvp' && source?.listingError && !mergedListings.length) {
+    results.replaceChildren(emptyNode(source.listingError));
+    return;
+  }
+
   const listings = visibleListings();
   const nodes: HTMLElement[] = [];
   nodes.push(resultsMetaNode(listings.length));
+
+  if (currentSource === 'vvmvp') {
+    if (!listings.length) {
+      nodes.push(emptyNode('No matching programs at Bangalore Ashram.'));
+    } else {
+      for (const listing of listings) nodes.push(renderListingCard(listing));
+    }
+    if (officialUrl) nodes.push(moreResultsLink(officialUrl));
+    results.replaceChildren(...nodes);
+    return;
+  }
+
   const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
   const grouped = selected.length !== 1;
 
@@ -405,6 +502,11 @@ function resultsMetaNode(count: number): HTMLElement {
   const meta = document.createElement('div');
   meta.className = 'results-meta';
   const label = selectedCategoryLabel();
+  if (currentSource === 'vvmvp') {
+    meta.textContent =
+      label + ' · ' + String(count) + (count === 1 ? ' program' : ' programs');
+    return meta;
+  }
   if (currentMode === 'in_person') {
     const place = selectedLocation?.city || selectedLocation?.label || 'this location';
     meta.textContent =
@@ -424,6 +526,11 @@ function resultsMetaNode(count: number): HTMLElement {
 }
 
 function selectedCategoryLabel(): string {
+  if (currentSource === 'vvmvp') {
+    return selectedAshramCategory
+      ? vvmvpCategoryLabel(selectedAshramCategory)
+      : 'Programs';
+  }
   const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
   if (!selected.length) return 'Programs';
   return selected.map((id) => courseCategoryLabel(id)).join(', ');
@@ -601,6 +708,7 @@ function emptyNode(label: string): HTMLElement {
 
 function resetListings() {
   mergedListings = [];
+  ashramCategories = [];
   officialUrl = '';
   currentRadiusKm = FIRST_RADIUS_KM;
 }
@@ -772,5 +880,23 @@ function persistCategories() {
     localStorage.setItem(CATEGORY_STORAGE_KEY, serializeCourseCategories(selectedCategories));
   } catch {
     // Ignore storage failures; the selected categories still apply for this visit.
+  }
+}
+
+function readStoredAshramCategory(): string {
+  try {
+    return (localStorage.getItem(ASHRAM_CATEGORY_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function persistAshramCategory() {
+  try {
+    if (selectedAshramCategory) {
+      localStorage.setItem(ASHRAM_CATEGORY_STORAGE_KEY, selectedAshramCategory);
+    }
+  } catch {
+    // Ignore storage failures; the selected ashram category still applies for this visit.
   }
 }

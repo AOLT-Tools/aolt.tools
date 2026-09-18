@@ -24,6 +24,7 @@ import {
   type AolListingPage
 } from './sources/aolListings.js';
 import { aolSearchAdapter, buildAolFilters } from './sources/aolSearchAdapter.js';
+import { fetchVvmvpBangaloreListings } from './sources/vvmvpListings.js';
 import { routeSources, SEARCH_SOURCE_ADAPTERS } from './sourceRouter.js';
 
 export type IntentParser = {
@@ -157,6 +158,8 @@ export class OfficialSearchService {
     const source = adapter.buildResult(intent, now);
     if (sourceId === 'aol') {
       await this.attachCatalogListings(source, intent, now, messages);
+    } else if (sourceId === 'vvmvp') {
+      await this.attachVvmvpCatalogListings(source, messages);
     }
 
     return {
@@ -195,6 +198,29 @@ export class OfficialSearchService {
       source.listingError = detail;
       messages.push(
         'Official Art of Living listings could not be loaded. Use View official results to open the same search on artofliving.org.'
+      );
+    }
+  }
+
+  private async attachVvmvpCatalogListings(
+    source: SourceSearchResult,
+    messages: string[]
+  ): Promise<void> {
+    try {
+      const page = await fetchVvmvpBangaloreListings({
+        fetchImpl: this.options.fetchImpl
+      });
+      source.listings = page.listings;
+      source.listingTotal = page.total;
+      source.listingCategories = page.categories;
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message
+          : 'Could not load Bangalore Ashram listings.';
+      source.listingError = detail;
+      messages.push(
+        'Official Bangalore Ashram listings could not be loaded. Use More on official site to open the same programs on programs.vvmvp.org.'
       );
     }
   }

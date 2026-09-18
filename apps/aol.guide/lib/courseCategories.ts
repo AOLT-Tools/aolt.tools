@@ -5,7 +5,7 @@ export type CourseCategoryId =
   | 'kids'
   | 'yoga'
   | 'advanced'
-  | 'follow_up'
+  | 'regular_connects'
   | 'other';
 
 export type CourseFilterId = CourseCategoryId;
@@ -15,7 +15,7 @@ export const COURSE_CATEGORY_ORDER: readonly CourseCategoryId[] = [
   'kids',
   'yoga',
   'advanced',
-  'follow_up',
+  'regular_connects',
   'other'
 ];
 
@@ -26,7 +26,7 @@ export const COURSE_CATEGORY_LABELS: Record<CourseFilterId, string> = {
   kids: 'Kids',
   yoga: 'Yoga',
   advanced: 'Advanced',
-  follow_up: 'Follow-up',
+  regular_connects: 'Regular Connects',
   other: 'Other'
 };
 
@@ -34,6 +34,7 @@ export const AOL_RADIUS_LADDER_KM = [3, 10, 25, 50] as const;
 
 const KIDS_TITLE = /\b(kids?|junior|teens?|child(?:ren)?)\b/i;
 const SAHAJ_TITLE = /sahaj\s+samadhi/i;
+const SATSANG_TITLE = /\bsatsangs?\b/i;
 
 const CATEGORY_BY_CODE: Record<string, CourseCategoryId> = {
   HP: 'beginner',
@@ -46,7 +47,7 @@ const CATEGORY_BY_CODE: Record<string, CourseCategoryId> = {
   DSN: 'advanced',
   SANYAM: 'advanced',
   VTP: 'advanced',
-  FOLLOW_UP: 'follow_up'
+  FOLLOW_UP: 'regular_connects'
 };
 
 const TYPE_ID_TO_CODE = new Map<string, string>();
@@ -61,8 +62,9 @@ export function courseCategoryLabel(id: CourseFilterId): string {
 }
 
 export function parseCourseFilter(value: string | undefined): CourseFilterId | undefined {
-  return COURSE_CATEGORY_ORDER.includes(value as CourseCategoryId)
-    ? (value as CourseCategoryId)
+  const id = value === 'follow_up' ? 'regular_connects' : value;
+  return COURSE_CATEGORY_ORDER.includes(id as CourseCategoryId)
+    ? (id as CourseCategoryId)
     : undefined;
 }
 
@@ -105,6 +107,7 @@ export function categorizeCourse(input: {
   if (code === 'SSDY' || SAHAJ_TITLE.test(title)) return 'beginner';
   if (code === 'IP' && KIDS_TITLE.test(title)) return 'kids';
   if (code && CATEGORY_BY_CODE[code]) return CATEGORY_BY_CODE[code];
+  if (SATSANG_TITLE.test(title)) return 'regular_connects';
   if (KIDS_TITLE.test(title)) return 'kids';
   return 'other';
 }

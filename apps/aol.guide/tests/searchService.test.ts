@@ -4,6 +4,7 @@ import { OfficialSearchService } from '../lib/searchService.js';
 import {
   aolListingsFetchMock,
   sampleAolCourse,
+  sampleVvmvpPageHtml,
   sequentialAolListingsFetchMock,
   testPincodeResolver
 } from './helpers.js';
@@ -397,5 +398,45 @@ describe('official search service', () => {
     expect(result.sources[0]?.url).toContain('selectedLocName=Bengaluru');
     expect(result.sources[0]?.url).not.toContain('560077');
     expect(result.sources[0]?.listings?.[0]?.category).toBe('beginner');
+  });
+
+  it('loads live Bangalore Ashram listings for the Ashram catalogue', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: (async (input: Parameters<typeof fetch>[0]) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+        requested.push(url);
+        return new Response(sampleVvmvpPageHtml(), {
+          status: 200,
+          headers: { 'content-type': 'text/html' }
+        });
+      }) as typeof fetch
+    });
+    const result = await service.search({ source: 'vvmvp' });
+    expect(requested[0]).toContain('https://programs.vvmvp.org/ashrams/bangalore/');
+    expect(result.usedGemini).toBe(false);
+    expect(result.intent.ashramMentioned).toBe(true);
+    expect(result.sources[0]?.source).toBe('vvmvp');
+    expect(result.sources[0]?.listingCategories).toEqual([
+      'Advanced Programs',
+      'Beginner Programs',
+      'Children and Teens',
+      'Online Programs',
+      'Guru Puja Programs'
+    ]);
+    expect(result.sources[0]?.listings?.some((listing) => listing.title === 'Vasad Happiness Program')).toBe(
+      false
+    );
+    expect(result.sources[0]?.listings?.[0]?.category).toBe('Beginner Programs');
+    expect(result.sources[0]?.listings?.find((listing) => listing.id === '4134')?.registerUrl).toBe(
+      'https://programs.vvmvp.org/events/4134'
+    );
   });
 });

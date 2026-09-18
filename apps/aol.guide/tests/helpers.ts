@@ -106,3 +106,115 @@ export function aolListingsFetchMock(
     );
   }) as typeof fetch;
 }
+
+export function sampleVvmvpEvent(
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    id: '4134',
+    name: 'Sahaj Samadhi Dhyan Yoga (18 - 20 September 2026)',
+    ashram_id: '1',
+    slug: 'bangalore',
+    category_id: '2',
+    category: 'Beginner Programs',
+    program_category: 'Beginner Programs',
+    event_start: '2026-09-18 17:15:00',
+    event_end: '2026-09-20 13:00:00',
+    mode: 'residential',
+    languages: ['1', '2'],
+    ashramName: 'Bangalore Ashram, Bangalore, Karnataka',
+    from: '18th',
+    to: '20th Sep, 2026',
+    ...overrides
+  };
+}
+
+export function sampleVvmvpPageHtml(
+  events: Record<string, unknown>[] = [
+    sampleVvmvpEvent(),
+    sampleVvmvpEvent({
+      id: '4200',
+      name: 'Weekly 4 Days AMP (24 - 27 September 2026)',
+      category_id: '1',
+      category: 'Advanced Programs',
+      program_category: 'Advanced Programs',
+      event_start: '2026-09-24 06:30:00',
+      event_end: '2026-09-27 13:00:00',
+      from: '24th',
+      to: '27th Sep, 2026'
+    }),
+    sampleVvmvpEvent({
+      id: '4300',
+      name: 'Intuition Process for Teens',
+      category_id: '6',
+      category: 'Children and Teens',
+      program_category: 'Children and Teens',
+      event_start: '2026-10-02 09:00:00',
+      event_end: '2026-10-04 17:00:00',
+      from: '2nd',
+      to: '4th Oct, 2026'
+    }),
+    sampleVvmvpEvent({
+      id: '4400',
+      name: 'Online Home-Grown Home Cooked',
+      category_id: '7',
+      category: 'Online Programs',
+      program_category: 'Online Programs',
+      event_start: '2026-10-03 09:00:00',
+      event_end: '2026-10-10 23:30:00',
+      mode: 'online',
+      from: '3rd',
+      to: '10th Oct, 2026'
+    }),
+    sampleVvmvpEvent({
+      id: '99',
+      name: 'Guru Puja',
+      category_id: '4',
+      category: 'Guru Puja Programs',
+      program_category: 'Guru Puja Programs',
+      event_start: '2026-11-01 09:00:00',
+      event_end: '2026-11-01 11:00:00',
+      from: '1st',
+      to: '1st Nov, 2026'
+    }),
+    sampleVvmvpEvent({
+      id: '5000',
+      name: 'Vasad Happiness Program',
+      ashram_id: '2',
+      slug: 'vasad',
+      ashramName: 'Vasad Ashram'
+    })
+  ]
+): string {
+  const payload = {
+    nonce: 'test',
+    url: 'https://programs.vvmvp.org/wp-json/vvmvp/v2',
+    programs: [
+      { id: '15', category: 'Advanced Programs', category_id: '1', program: 'AMP' },
+      { id: '1', category: 'Beginner Programs', category_id: '2', program: 'HP' },
+      { id: '20', category: 'Health', category_id: '8', program: 'Health' },
+      { id: '30', category: 'Children and Teens', category_id: '6', program: 'Kids' },
+      { id: '39', category: 'Online Programs', category_id: '7', program: 'Online' },
+      { id: '40', category: 'Guru Puja Programs', category_id: '4', program: 'Guru Puja' }
+    ],
+    languages: [
+      { id: '1', language: 'English' },
+      { id: '2', language: 'Hindi' }
+    ],
+    ashrams: [
+      {
+        id: '1',
+        slug: 'bangalore',
+        ashram: 'Bangalore Ashram',
+        city: 'Bangalore',
+        address: '21st KM, Kanakapura Road, Udayapura, Bangalore – 560082'
+      },
+      { id: '2', slug: 'vasad', ashram: 'Vasad Ashram' }
+    ],
+    events
+  };
+  return `<!doctype html><html><body><script>
+var vvmvp_event_list = ${JSON.stringify(payload)};
+//# sourceURL=vvmvp-event-list-js-extra
+</script></body></html>`;
+}

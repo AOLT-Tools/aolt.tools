@@ -71,6 +71,7 @@ export type SourceSearchResult = {
   listings?: OfficialCourseListing[];
   listingTotal?: number;
   listingError?: string;
+  listingCategories?: string[];
 };
 
 export interface SearchSourceAdapter {
