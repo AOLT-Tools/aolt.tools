@@ -6,6 +6,7 @@ import {
   parseDatePreset,
   parseSearchSource,
   parseRadiusKm,
+  parseIsoDate,
   readLocation
 } from '../lib/searchRequest.js';
 
@@ -14,8 +15,10 @@ const SearchBodySchema = z.object({
   source: z.enum(['aol', 'vvmvp', 'vds']).optional(),
   mode: z.enum(['in_person', 'online']).optional(),
   datePreset: z
-    .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days'])
+    .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days', 'custom'])
     .optional(),
+  dateFrom: z.string().trim().optional(),
+  dateTo: z.string().trim().optional(),
   radiusKm: z.number().positive().max(250).optional(),
   location: z
     .object({
@@ -49,6 +52,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       source: parseSearchSource(body.source),
       mode: parseSearchMode(body.mode),
       datePreset: parseDatePreset(body.datePreset),
+      dateFrom: parseIsoDate(body.dateFrom),
+      dateTo: parseIsoDate(body.dateTo),
       radiusKm: parseRadiusKm(body.radiusKm),
       location: readLocation(body.location)
     });

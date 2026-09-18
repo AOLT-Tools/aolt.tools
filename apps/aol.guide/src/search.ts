@@ -10,6 +10,13 @@ import {
 } from '../lib/courseCategories.js';
 import { vvmvpCategoryLabel } from '../lib/sources/vvmvpListings.js';
 import {
+  addCalendarDays,
+  parseIsoDate,
+  resolveOnlineTimePreset,
+  todayInIndia,
+  type OnlineTimePreset
+} from '../lib/dateRanges.js';
+import {
   loadMapboxSearchJs,
   locationFromMapboxRetrieve,
   type BrowserLocation
@@ -17,12 +24,7 @@ import {
 
 type SearchSource = 'aol' | 'vvmvp' | 'vds';
 type SearchMode = 'in_person' | 'online';
-type TimePreset =
-  | 'anytime'
-  | 'today'
-  | 'tomorrow'
-  | 'this_weekend'
-  | 'next_7_days';
+type TimePreset = OnlineTimePreset;
 
 type OfficialCourseListing = {
   id: string;
@@ -66,6 +68,22 @@ type SearchResponse = {
 const SOURCE_STORAGE_KEY = 'aol-guide-search-source';
 const MODE_STORAGE_KEY = 'aol-guide-search-mode';
 const TIME_STORAGE_KEY = 'aol-guide-online-time';
+const TIME_FROM_STORAGE_KEY = 'aol-guide-online-date-from';
+const TIME_TO_STORAGE_KEY = 'aol-guide-online-date-to';
+const SHORT_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+];
 const CATEGORY_STORAGE_KEY = 'aol-guide-course-category';
 const ASHRAM_CATEGORY_STORAGE_KEY = 'aol-guide-ashram-category';
 const FIRST_RADIUS_KM = 3;
@@ -78,12 +96,19 @@ const modeToggle = document.querySelector<HTMLElement>('#search-mode');
 const locationControl = document.querySelector<HTMLElement>('#location-control');
 const locationHost = document.querySelector<HTMLElement>('#location-host');
 const timeControl = document.querySelector<HTMLElement>('#time-control');
-const timeSelect = document.querySelector<HTMLSelectElement>('#time-preset');
+const timeRangeControl = document.querySelector<HTMLButtonElement>('#time-range-control');
+const timeRangeLabel = document.querySelector<HTMLElement>('#time-range-label');
+const timeShortcut = document.querySelector<HTMLSelectElement>('#time-shortcut');
+const timeCustomPanel = document.querySelector<HTMLElement>('#time-custom-panel');
+const dateFromInput = document.querySelector<HTMLInputElement>('#date-from');
+const dateToInput = document.querySelector<HTMLInputElement>('#date-to');
 const categoryChips = document.querySelector<HTMLElement>('#category-chips');
 
 let currentSource: SearchSource = readStoredSource();
 let currentMode: SearchMode = readStoredMode();
 let currentTimePreset: TimePreset = readStoredTime();
+let customDateFrom = readStoredIsoDate(TIME_FROM_STORAGE_KEY);
+let customDateTo = readStoredIsoDate(TIME_TO_STORAGE_KEY);
 let selectedCategories = new Set<CourseCategoryId>(readStoredCategories());
 let selectedAshramCategory = readStoredAshramCategory();
 let ashramCategories: string[] = [];
@@ -91,6 +116,9 @@ let selectedLocation: BrowserLocation | undefined;
 let currentRadiusKm = FIRST_RADIUS_KM;
 let mergedListings: OfficialCourseListing[] = [];
 let officialUrl = '';
+let searchRequestId = 0;
+let searchAbort: AbortController | null = null;
+let timeCustomOpen = false;
 
 initializeSearchPage();
 
@@ -102,7 +130,7 @@ function initializeSearchPage() {
   renderModeToggle();
   syncControls();
   renderCategoryChips();
-  if (timeSelect) timeSelect.value = currentTimePreset;
+  renderTimeControls();
   void mountMapboxSearchBox();
   renderIdleState();
 
@@ -134,11 +162,20 @@ function initializeSearchPage() {
     void runCatalogSearch();
   });
 
-  timeSelect?.addEventListener('change', () => {
-    currentTimePreset = parseTimePreset(timeSelect.value) || 'anytime';
-    persistTime(currentTimePreset);
-    resetListings();
-    void runCatalogSearch();
+  timeShortcut?.addEventListener('change', () => {
+    applyTimeShortcut(parseTimePreset(timeShortcut.value) || 'anytime');
+  });
+
+  timeRangeControl?.addEventListener('click', () => {
+    toggleCustomEditor();
+  });
+
+  dateFromInput?.addEventListener('change', () => {
+    onDateInputsChanged();
+  });
+
+  dateToInput?.addEventListener('change', () => {
+    onDateInputsChanged();
   });
 
   categoryChips?.addEventListener('click', (event) => {
@@ -171,8 +208,10 @@ function syncControls() {
   if (modeToggle) modeToggle.hidden = !courses;
   if (locationControl) locationControl.hidden = !inPerson;
   if (timeControl) timeControl.hidden = !online;
+  if (!online) timeCustomOpen = false;
   const filterSlot = document.querySelector<HTMLElement>('#filter-slot');
-  if (filterSlot) filterSlot.hidden = !inPerson && !online;
+  if (filterSlot) filterSlot.hidden = !inPerson;
+  renderTimeControls();
   if (categoryChips && currentSource === 'vds') {
     categoryChips.hidden = true;
     categoryChips.replaceChildren();
@@ -193,13 +232,19 @@ function renderIdleState() {
   void runCatalogSearch();
 }
 
-let searchRequestId = 0;
-let searchAbort: AbortController | null = null;
-
 async function runCatalogSearch(options: { append?: boolean } = {}) {
   if (!results) return;
   if (currentSource === 'aol' && currentMode === 'in_person' && !selectedLocation) {
     results.replaceChildren(emptyNode('Pick a location to see programs nearby.'));
+    return;
+  }
+  if (
+    currentSource === 'aol' &&
+    currentMode === 'online' &&
+    currentTimePreset === 'custom' &&
+    !customDateRange()
+  ) {
+    results.replaceChildren(emptyNode('Pick a start and end date.'));
     return;
   }
 
@@ -267,6 +312,18 @@ async function fetchCatalog(
       datePreset:
         currentSource === 'aol' && currentMode === 'online'
           ? currentTimePreset
+          : undefined,
+      dateFrom:
+        currentSource === 'aol' &&
+        currentMode === 'online' &&
+        currentTimePreset === 'custom'
+          ? customDateFrom || undefined
+          : undefined,
+      dateTo:
+        currentSource === 'aol' &&
+        currentMode === 'online' &&
+        currentTimePreset === 'custom'
+          ? customDateTo || undefined
           : undefined,
       radiusKm,
       location:
@@ -725,6 +782,163 @@ function renderModeToggle() {
   });
 }
 
+function renderTimeControls() {
+  if (currentTimePreset !== 'anytime' && currentTimePreset !== 'custom') {
+    applyPresetDates(currentTimePreset);
+  } else if (currentTimePreset === 'custom') {
+    ensureCustomDates();
+  }
+  const anytime = currentTimePreset === 'anytime';
+  const showCustom = Boolean(timeCustomOpen && timeControl && !timeControl.hidden);
+  if (timeShortcut) timeShortcut.value = currentTimePreset;
+  if (timeRangeLabel) {
+    timeRangeLabel.textContent = anytime
+      ? 'Anytime'
+      : formatCompactDateRange(customDateFrom, customDateTo);
+  }
+  if (timeRangeControl) {
+    timeRangeControl.setAttribute('aria-expanded', String(showCustom));
+  }
+  if (timeCustomPanel) timeCustomPanel.hidden = !showCustom;
+  const today = todayInIndia();
+  const max = addCalendarDays(today, 365);
+  if (dateFromInput) {
+    dateFromInput.min = today;
+    dateFromInput.max = max;
+    dateFromInput.value = anytime ? '' : customDateFrom;
+  }
+  if (dateToInput) {
+    dateToInput.min = anytime ? today : customDateFrom || today;
+    dateToInput.max = max;
+    dateToInput.value = anytime ? '' : customDateTo;
+  }
+}
+
+function applyTimeShortcut(preset: TimePreset) {
+  currentTimePreset = preset;
+  persistTime(preset);
+  timeCustomOpen = preset === 'custom';
+  if (preset === 'anytime') {
+    customDateFrom = '';
+    customDateTo = '';
+    persistCustomDates();
+  } else if (preset === 'custom') {
+    ensureCustomDates();
+  } else {
+    applyPresetDates(preset);
+    persistCustomDates();
+  }
+  renderTimeControls();
+  resetListings();
+  void runCatalogSearch();
+}
+
+function toggleCustomEditor() {
+  if (timeCustomOpen) {
+    timeCustomOpen = false;
+    renderTimeControls();
+    return;
+  }
+  timeCustomOpen = true;
+  if (currentTimePreset === 'anytime') {
+    applyTimeShortcut('custom');
+    return;
+  }
+  if (currentTimePreset !== 'custom') {
+    currentTimePreset = 'custom';
+    persistTime('custom');
+  }
+  renderTimeControls();
+}
+
+function formatCompactDateRange(from: string, to: string): string {
+  const start = parseIsoDate(from);
+  const end = parseIsoDate(to);
+  if (!start || !end) return 'Anytime';
+  const startParts = start.split('-').map(Number);
+  const endParts = end.split('-').map(Number);
+  const startMonth = SHORT_MONTHS[(startParts[1] || 1) - 1] || '';
+  const endMonth = SHORT_MONTHS[(endParts[1] || 1) - 1] || '';
+  const startDay = startParts[2] || 1;
+  const endDay = endParts[2] || 1;
+  if (start === end) return startDay + ' ' + startMonth;
+  if (startParts[0] === endParts[0] && startParts[1] === endParts[1]) {
+    return startDay + '–' + endDay + ' ' + startMonth;
+  }
+  if (startParts[0] === endParts[0]) {
+    return startDay + ' ' + startMonth + ' – ' + endDay + ' ' + endMonth;
+  }
+  return (
+    startDay +
+    ' ' +
+    startMonth +
+    ' ' +
+    startParts[0] +
+    ' – ' +
+    endDay +
+    ' ' +
+    endMonth +
+    ' ' +
+    endParts[0]
+  );
+}
+
+function applyPresetDates(preset: Exclude<TimePreset, 'anytime' | 'custom'>) {
+  const range = resolveOnlineTimePreset(preset);
+  if (!range) return;
+  customDateFrom = range.start;
+  customDateTo = range.end;
+}
+
+function onDateInputsChanged() {
+  customDateFrom = parseIsoDate(dateFromInput?.value) || '';
+  customDateTo = parseIsoDate(dateToInput?.value) || '';
+  if (customDateFrom && !customDateTo) customDateTo = customDateFrom;
+  if (customDateTo && !customDateFrom) customDateFrom = customDateTo;
+  if (customDateFrom && customDateTo && customDateTo < customDateFrom) {
+    customDateTo = customDateFrom;
+  }
+  persistCustomDates();
+  currentTimePreset = presetMatchingDates(customDateFrom, customDateTo);
+  persistTime(currentTimePreset);
+  renderTimeControls();
+  resetListings();
+  void runCatalogSearch();
+}
+
+function presetMatchingDates(from: string, to: string): TimePreset {
+  if (!from && !to) return 'anytime';
+  const start = parseIsoDate(from);
+  const end = parseIsoDate(to);
+  if (!start || !end) return 'anytime';
+  const shortcuts: Array<Exclude<TimePreset, 'anytime' | 'custom'>> = [
+    'today',
+    'tomorrow',
+    'this_weekend',
+    'next_7_days'
+  ];
+  for (const preset of shortcuts) {
+    const range = resolveOnlineTimePreset(preset);
+    if (range?.start === start && range.end === end) return preset;
+  }
+  return 'custom';
+}
+
+function ensureCustomDates() {
+  const today = todayInIndia();
+  if (!parseIsoDate(customDateFrom)) customDateFrom = today;
+  if (!parseIsoDate(customDateTo)) customDateTo = addCalendarDays(customDateFrom, 6);
+  if (customDateTo < customDateFrom) customDateTo = customDateFrom;
+  persistCustomDates();
+}
+
+function customDateRange(): { from: string; to: string } | undefined {
+  const from = parseIsoDate(customDateFrom);
+  const to = parseIsoDate(customDateTo);
+  if (!from || !to) return undefined;
+  return from <= to ? { from, to } : { from: to, to: from };
+}
+
 function setStatus(label: string, state: 'idle' | 'loading' | 'error' = 'idle') {
   if (!statusPill) return;
   statusPill.hidden = state === 'idle' || !label;
@@ -813,7 +1027,8 @@ function parseTimePreset(value: string | undefined): TimePreset | undefined {
     value === 'today' ||
     value === 'tomorrow' ||
     value === 'this_weekend' ||
-    value === 'next_7_days'
+    value === 'next_7_days' ||
+    value === 'custom'
     ? value
     : undefined;
 }
@@ -863,6 +1078,23 @@ function persistTime(preset: TimePreset) {
     localStorage.setItem(TIME_STORAGE_KEY, preset);
   } catch {
     // Ignore storage failures; the selected range still applies for this visit.
+  }
+}
+
+function readStoredIsoDate(key: string): string {
+  try {
+    return parseIsoDate(localStorage.getItem(key) || '') || '';
+  } catch {
+    return '';
+  }
+}
+
+function persistCustomDates() {
+  try {
+    if (customDateFrom) localStorage.setItem(TIME_FROM_STORAGE_KEY, customDateFrom);
+    if (customDateTo) localStorage.setItem(TIME_TO_STORAGE_KEY, customDateTo);
+  } catch {
+    // Ignore storage failures; the selected custom dates still apply for this visit.
   }
 }
 

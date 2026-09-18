@@ -87,6 +87,7 @@ function attachSearchApi(server: {
         parseDatePreset,
         parseSearchSource,
         parseRadiusKm,
+        parseIsoDate,
         readLocation
       } = await import('./lib/searchRequest.ts');
       const source = parseSearchSource(body.source);
@@ -103,6 +104,8 @@ function attachSearchApi(server: {
         source,
         mode: parseSearchMode(body.mode),
         datePreset: parseDatePreset(body.datePreset),
+        dateFrom: parseIsoDate(body.dateFrom),
+        dateTo: parseIsoDate(body.dateTo),
         radiusKm: parseRadiusKm(body.radiusKm),
         location: readLocation(body.location)
       });

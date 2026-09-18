@@ -132,17 +132,40 @@
               />
             </div>
           </div>
+        </div>
 
-          <div class="filter-control" id="time-control" hidden>
-            <span class="filter-icon" aria-hidden="true">🕐</span>
-            <label for="time-preset" class="sr-only">Course dates</label>
-            <select id="time-preset" class="filter-select">
+        <div class="time-panel mt-1.5" id="time-control" hidden>
+          <div class="time-control">
+            <button
+              type="button"
+              class="filter-control time-range-control"
+              id="time-range-control"
+              aria-expanded="false"
+              aria-controls="time-custom-panel"
+            >
+              <span class="filter-icon" aria-hidden="true">📅</span>
+              <span class="time-range-label" id="time-range-label">Anytime</span>
+            </button>
+            <label class="sr-only" for="time-shortcut">Date shortcuts</label>
+            <select id="time-shortcut" class="time-shortcut">
               <option value="anytime">Anytime</option>
               <option value="today">Today</option>
               <option value="tomorrow">Tomorrow</option>
-              <option value="this_weekend">This weekend</option>
-              <option value="next_7_days">Next 7 days</option>
+              <option value="this_weekend">Weekend</option>
+              <option value="next_7_days">7 days</option>
+              <option value="custom">Custom</option>
             </select>
+          </div>
+          <div class="time-custom-panel" id="time-custom-panel" hidden>
+            <label class="time-custom-field" for="date-from">
+              <span>From</span>
+              <input id="date-from" class="date-input" type="date" />
+            </label>
+            <span class="date-sep" aria-hidden="true">–</span>
+            <label class="time-custom-field" for="date-to">
+              <span>To</span>
+              <input id="date-to" class="date-input" type="date" />
+            </label>
           </div>
         </div>
 

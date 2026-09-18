@@ -4,6 +4,7 @@ import {
   findCourseAliasByCode
 } from './courseAliases.js';
 import {
+  resolveCustomDateRange,
   resolveOnlineTimePreset,
   type OnlineTimePreset
 } from './dateRanges.js';
@@ -46,6 +47,8 @@ export type OfficialSearchRequest = {
   mode?: SearchMode;
   location?: SelectedSearchLocation;
   datePreset?: OnlineTimePreset;
+  dateFrom?: string;
+  dateTo?: string;
   radiusKm?: number;
 };
 
@@ -420,6 +423,8 @@ function normalizeSearchRequest(
     mode: input.mode,
     location: input.location,
     datePreset: input.datePreset,
+    dateFrom: input.dateFrom,
+    dateTo: input.dateTo,
     radiusKm: input.radiusKm
   };
 }
@@ -457,17 +462,26 @@ export function applySearchControls(
   now: Date
 ): ResolvedSearchIntent {
   if (request.mode === 'online') {
-    const range = resolveOnlineTimePreset(request.datePreset, now);
-    const anytime = request.datePreset === 'anytime';
+    const custom =
+      request.datePreset === 'custom'
+        ? resolveCustomDateRange(request.dateFrom, request.dateTo)
+        : undefined;
+    const range =
+      request.datePreset === 'custom'
+        ? custom
+        : resolveOnlineTimePreset(request.datePreset, now);
+    const unfiltered =
+      request.datePreset === 'anytime' ||
+      (request.datePreset === 'custom' && !custom);
     return {
       ...intent,
       deliveryMode: 'online',
       latitude: undefined,
       longitude: undefined,
       radiusKm: undefined,
-      dateFrom: anytime ? undefined : range?.start || intent.dateFrom,
-      dateTo: anytime ? undefined : range?.end || intent.dateTo,
-      dateLabel: anytime ? undefined : range?.label || intent.dateLabel
+      dateFrom: unfiltered ? undefined : range?.start || intent.dateFrom,
+      dateTo: unfiltered ? undefined : range?.end || intent.dateTo,
+      dateLabel: unfiltered ? undefined : range?.label || intent.dateLabel
     };
   }
   if (request.mode !== 'in_person') return intent;

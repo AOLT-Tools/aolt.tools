@@ -1,4 +1,4 @@
-import type { OnlineTimePreset } from './dateRanges.js';
+import { parseIsoDate, type OnlineTimePreset } from './dateRanges.js';
 import type {
   SearchMode,
   SelectedSearchLocation
@@ -24,10 +24,13 @@ export function parseDatePreset(value: unknown): OnlineTimePreset | undefined {
     value === 'today' ||
     value === 'tomorrow' ||
     value === 'this_weekend' ||
-    value === 'next_7_days'
+    value === 'next_7_days' ||
+    value === 'custom'
     ? value
     : undefined;
 }
+
+export { parseIsoDate };
 
 export function readLocation(value: unknown): SelectedSearchLocation | undefined {
   if (!value || typeof value !== 'object') return undefined;

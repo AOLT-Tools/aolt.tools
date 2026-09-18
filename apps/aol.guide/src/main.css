@@ -83,6 +83,60 @@
     @apply cursor-pointer appearance-none bg-transparent;
   }
 
+  .time-panel[hidden] {
+    display: none !important;
+  }
+
+  .time-control {
+    @apply flex items-center gap-1.5;
+  }
+
+  .time-range-control {
+    @apply min-w-0 flex-1 cursor-pointer touch-manipulation gap-1.5 pr-3 text-left;
+    font: inherit;
+    color: inherit;
+    appearance: none;
+  }
+
+  .time-range-label {
+    @apply min-w-0 flex-1 truncate text-left text-[13px] font-semibold text-slate-900;
+  }
+
+  .time-custom-panel {
+    @apply mt-1.5 flex items-end gap-1.5;
+  }
+
+  .time-custom-panel[hidden] {
+    display: none !important;
+  }
+
+  .time-custom-field {
+    @apply flex min-w-0 flex-1 flex-col gap-0.5;
+  }
+
+  .time-custom-field span {
+    @apply pl-3 text-[10px] font-bold tracking-[0.08em] text-slate-500 uppercase;
+  }
+
+  .date-sep {
+    @apply mb-2.5 shrink-0 text-[12px] font-semibold text-slate-400;
+  }
+
+  .date-input {
+    @apply h-10 w-full min-w-0 rounded-full border border-slate-200 bg-slate-50 px-3 text-base font-semibold text-slate-900 outline-none;
+    color-scheme: light;
+  }
+
+  .date-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.55;
+  }
+
+  .time-shortcut {
+    @apply h-8 w-[6.5rem] shrink-0 cursor-pointer appearance-none rounded-full border border-orange-200 bg-orange-50 bg-[length:12px] bg-[position:right_0.55rem_center] bg-no-repeat pr-6 pl-2.5 text-[12px] font-semibold text-[#9a3412] outline-none touch-manipulation;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239a3412' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+
   .filter-control-body mapbox-search-box {
     display: block;
     width: 100%;

@@ -360,6 +360,32 @@ describe('official search service', () => {
     expect(requested[0]).toContain('start_date_to=2026-09-04');
   });
 
+  it('uses a custom online date range on the official listings API', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock(
+        [sampleAolCourse({ is_online_event: 1, dist: undefined })],
+        1,
+        requested
+      )
+    });
+    const result = await service.search({
+      source: 'aol',
+      mode: 'online',
+      datePreset: 'custom',
+      dateFrom: '2026-09-12',
+      dateTo: '2026-09-20'
+    });
+    expect(result.intent.dateFrom).toBe('2026-09-12');
+    expect(result.intent.dateTo).toBe('2026-09-20');
+    expect(result.intent.dateLabel).toBe('2026-09-12 to 2026-09-20');
+    expect(requested[0]).toContain('start_date_from=2026-09-12');
+    expect(requested[0]).toContain('start_date_to=2026-09-20');
+    expect(requested[0]).toContain('is_online_event=1');
+  });
+
   it('searches the Courses catalogue by Mapbox coordinates and ignores the place pincode', async () => {
     const requested: string[] = [];
     const resolve = vi.fn();

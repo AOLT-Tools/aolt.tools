@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { locationFromMapboxRetrieve } from '../src/mapboxSearchJs.js';
-import { resolveOnlineTimePreset } from '../lib/dateRanges.js';
+import {
+  parseIsoDate,
+  resolveCustomDateRange,
+  resolveOnlineTimePreset
+} from '../lib/dateRanges.js';
 
 describe('browser Mapbox retrieve parsing', () => {
   it('reads coordinates from a Search Box retrieve payload', () => {
@@ -66,6 +70,16 @@ describe('online time presets', () => {
       start: '2026-09-04',
       end: '2026-09-10',
       label: 'Next 7 days'
+    });
+  });
+
+  it('accepts a custom from/to duration and swaps reversed dates', () => {
+    expect(parseIsoDate('2026-02-31')).toBeUndefined();
+    expect(resolveOnlineTimePreset('custom', now)).toBeUndefined();
+    expect(resolveCustomDateRange('2026-09-20', '2026-09-10')).toEqual({
+      start: '2026-09-10',
+      end: '2026-09-20',
+      label: '2026-09-10 to 2026-09-20'
     });
   });
 });

@@ -45,13 +45,49 @@ export type OnlineTimePreset =
   | 'today'
   | 'tomorrow'
   | 'this_weekend'
-  | 'next_7_days';
+  | 'next_7_days'
+  | 'custom';
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+export function parseIsoDate(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const match = value.trim().match(ISO_DATE);
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  if (
+    utc.getUTCFullYear() !== year ||
+    utc.getUTCMonth() !== month - 1 ||
+    utc.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+  return match[1] + '-' + match[2] + '-' + match[3];
+}
+
+export function resolveCustomDateRange(
+  dateFrom?: string,
+  dateTo?: string
+): DateRange | undefined {
+  const start = parseIsoDate(dateFrom);
+  const end = parseIsoDate(dateTo);
+  if (!start || !end) return undefined;
+  const [from, to] = start <= end ? [start, end] : [end, start];
+  return {
+    start: from,
+    end: to,
+    label: from === to ? from : from + ' to ' + to
+  };
+}
 
 export function resolveOnlineTimePreset(
   preset: OnlineTimePreset | undefined,
   now = new Date()
 ): DateRange | undefined {
-  if (!preset || preset === 'anytime') return undefined;
+  if (!preset || preset === 'anytime' || preset === 'custom') return undefined;
   if (preset === 'next_7_days') {
     const start = todayInIndia(now);
     return {
