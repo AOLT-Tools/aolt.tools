@@ -26,7 +26,8 @@ describe('Art of Living official URL generation', () => {
     expect(url.startsWith('https://www.artofliving.org/in-en/search/course#')).toBe(
       true
     );
-    expect(url).toContain('selectedLocName=560045');
+    expect(url).toContain('selectedLocName=Bengaluru');
+    expect(url).not.toContain('selectedLocName=560045');
     expect(url).toContain('distance=10');
     expect(url).toContain('lat=' + String(pin!.latitude));
     expect(url).toContain('lng=' + String(pin!.longitude));
@@ -51,7 +52,8 @@ describe('Art of Living official URL generation', () => {
 
     expect(filters.distance).toBe('60');
     expect(url).toContain('distance=60');
-    expect(url).toContain('selectedLocName=560045');
+    expect(url).toContain('selectedLocName=Bengaluru');
+    expect(url).not.toContain('selectedLocName=560045');
     expect(url).toContain('lat=' + String(pin!.latitude));
     expect(url).toContain('lng=' + String(pin!.longitude));
     expect(url).not.toMatch(/is_online_event=/);
@@ -72,7 +74,7 @@ describe('Art of Living official URL generation', () => {
     expect(weekendFilters.course_language).toBe('hi');
     expect(weekendFilters.start_date_from).toBe('2026-09-05');
     expect(weekendFilters.start_date_to).toBe('2026-09-06');
-    expect(weekendFilters.selectedLocName).toBe('560045');
+    expect(weekendFilters.selectedLocName).toBe('Bengaluru');
     expect(weekendFilters).not.toHaveProperty('is_online_event');
 
     const online = buildAolFilters(parseSearchQuery('HP online', { now }), now);

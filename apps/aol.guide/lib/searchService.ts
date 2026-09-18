@@ -36,7 +36,6 @@ export type SelectedSearchLocation = {
   label: string;
   latitude: number;
   longitude: number;
-  pincode?: string;
   city?: string;
 };
 
@@ -177,6 +176,14 @@ export class OfficialSearchService {
     messages: string[]
   ): Promise<void> {
     try {
+      if (
+        intent.deliveryMode === 'in_person' &&
+        (typeof intent.latitude !== 'number' || typeof intent.longitude !== 'number')
+      ) {
+        source.listings = [];
+        source.listingTotal = 0;
+        return;
+      }
       const page = await fetchAolListingsForRadius(buildAolFilters(intent, now), {
         fetchImpl: this.options.fetchImpl,
         limit: this.options.aolListingLimit

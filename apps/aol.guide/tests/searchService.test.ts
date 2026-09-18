@@ -359,10 +359,11 @@ describe('official search service', () => {
     expect(requested[0]).toContain('start_date_to=2026-09-04');
   });
 
-  it('searches the Courses catalogue by Mapbox location at 3 km without NLP', async () => {
+  it('searches the Courses catalogue by Mapbox coordinates and ignores the place pincode', async () => {
     const requested: string[] = [];
+    const resolve = vi.fn();
     const service = new OfficialSearchService({
-      pincodeResolver: testPincodeResolver(),
+      pincodeResolver: { resolve },
       now,
       fetchImpl: aolListingsFetchMock([sampleAolCourse()], 1, requested)
     });
@@ -371,18 +372,30 @@ describe('official search service', () => {
       mode: 'in_person',
       radiusKm: 3,
       location: {
-        label: 'HSR Layout',
-        latitude: 12.9121,
-        longitude: 77.6446,
-        city: 'Bengaluru'
-      }
+        label: 'MSR North City',
+        latitude: 13.041018,
+        longitude: 77.621558,
+        city: 'Bengaluru',
+        pincode: '560077'
+      } as never
     });
+    expect(resolve).not.toHaveBeenCalled();
     expect(result.usedGemini).toBe(false);
     expect(result.intent.courseTypeIds).toEqual([]);
     expect(result.intent.radiusKm).toBe(3);
-    expect(requested[0]).toContain('lat=12.9121');
+    expect(result.intent.latitude).toBe(13.041018);
+    expect(result.intent.longitude).toBe(77.621558);
+    expect(result.intent.pincode).toBeUndefined();
+    expect(requested[0]).toContain('lat=13.041018');
+    expect(requested[0]).toContain('lng=77.621558');
+    expect(requested[0]).toContain('type=search');
     expect(requested[0]).toContain('distance=3');
     expect(requested[0]).not.toContain('ctype=');
+    expect(requested[0]).not.toContain('560077');
+    expect(result.sources[0]?.url).toContain('lat=13.041018');
+    expect(result.sources[0]?.url).toContain('lng=77.621558');
+    expect(result.sources[0]?.url).toContain('selectedLocName=Bengaluru');
+    expect(result.sources[0]?.url).not.toContain('560077');
     expect(result.sources[0]?.listings?.[0]?.category).toBe('beginner');
   });
 });

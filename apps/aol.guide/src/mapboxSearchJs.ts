@@ -20,7 +20,6 @@ export type BrowserLocation = {
   label: string;
   latitude: number;
   longitude: number;
-  pincode?: string;
   city?: string;
 };
 
@@ -41,7 +40,9 @@ export function locationFromMapboxRetrieve(
   const name =
     readString(properties.name) ||
     readString(properties.place_name) ||
-    readString(properties.full_address);
+    readString(properties.place_formatted) ||
+    readString(properties.full_address) ||
+    readString(properties.address);
   const point = coordinatesFromFeature(feature, properties);
   if (!name || !point) return undefined;
   const context = asRecord(properties.context) || {};
@@ -49,7 +50,6 @@ export function locationFromMapboxRetrieve(
     label: name,
     latitude: point.latitude,
     longitude: point.longitude,
-    pincode: contextName(context, 'postcode'),
     city: contextName(context, 'place') || contextName(context, 'locality')
   };
 }
@@ -69,16 +69,31 @@ function coordinatesFromFeature(
   feature: Record<string, unknown>,
   properties: Record<string, unknown>
 ): { latitude: number; longitude: number } | undefined {
-  const named = asRecord(properties.coordinates);
-  const namedLat = Number(named?.latitude);
-  const namedLng = Number(named?.longitude);
-  if (Number.isFinite(namedLat) && Number.isFinite(namedLng)) {
-    return { latitude: namedLat, longitude: namedLng };
-  }
-  const geometry = asRecord(feature.geometry);
-  const pair = Array.isArray(geometry?.coordinates) ? geometry.coordinates : [];
-  const longitude = Number(pair[0]);
-  const latitude = Number(pair[1]);
+  return (
+    namedCoordinates(asRecord(properties.coordinates)) ||
+    namedCoordinates(asRecord(feature.coordinates)) ||
+    namedCoordinates(properties) ||
+    pairCoordinates(properties.coordinates) ||
+    pairCoordinates(asRecord(feature.geometry)?.coordinates)
+  );
+}
+
+function namedCoordinates(
+  record: Record<string, unknown> | undefined
+): { latitude: number; longitude: number } | undefined {
+  if (!record) return undefined;
+  const latitude = Number(record.latitude ?? record.lat);
+  const longitude = Number(record.longitude ?? record.lng ?? record.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+  return { latitude, longitude };
+}
+
+function pairCoordinates(
+  value: unknown
+): { latitude: number; longitude: number } | undefined {
+  if (!Array.isArray(value) || value.length < 2) return undefined;
+  const longitude = Number(value[0]);
+  const latitude = Number(value[1]);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
   return { latitude, longitude };
 }

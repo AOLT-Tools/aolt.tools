@@ -120,10 +120,9 @@ export function buildAolFilters(
   if (hasCoordinates) {
     filters.lat = String(intent.latitude);
     filters.lng = String(intent.longitude);
-    if (intent.pincode) filters.selectedLocName = intent.pincode;
-    else if (intent.city) filters.selectedLocName = intent.city;
+    if (intent.city) filters.selectedLocName = intent.city;
   } else {
-    const locationName = intent.pincode || intent.city;
+    const locationName = intent.city || intent.pincode;
     if (locationName) filters.selectedLocName = locationName;
   }
   if (typeof intent.radiusKm === 'number') {
@@ -150,8 +149,7 @@ function visibleAolFilters(
   else if (filters.ctype) visible.ctype = filters.ctype;
   if (intent.teacher) visible.teacher = intent.teacher;
   if (hasCoordinates) {
-    if (intent.pincode) visible.pincode = intent.pincode;
-    else if (intent.city) visible.city = intent.city;
+    if (intent.city) visible.city = intent.city;
   } else if (intent.pincode) {
     visible.pincode = intent.pincode;
   } else if (intent.city) {

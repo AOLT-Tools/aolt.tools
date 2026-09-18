@@ -24,8 +24,32 @@ describe('browser Mapbox retrieve parsing', () => {
       label: 'HSR Layout',
       latitude: 12.9121,
       longitude: 77.6446,
-      city: 'Bengaluru',
-      pincode: '560102'
+      city: 'Bengaluru'
+    });
+  });
+
+  it('reads lat/lng aliases and ignores the Mapbox postcode', () => {
+    expect(
+      locationFromMapboxRetrieve({
+        features: [
+          {
+            geometry: { type: 'Point', coordinates: [77.621558, 13.041018] },
+            properties: {
+              name: 'MSR North City',
+              coordinates: { lat: 13.041018, lng: 77.621558 },
+              context: {
+                place: { name: 'Bengaluru' },
+                postcode: { name: '560077' }
+              }
+            }
+          }
+        ]
+      })
+    ).toEqual({
+      label: 'MSR North City',
+      latitude: 13.041018,
+      longitude: 77.621558,
+      city: 'Bengaluru'
     });
   });
 });

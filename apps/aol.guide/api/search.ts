@@ -5,7 +5,8 @@ import {
   parseSearchMode,
   parseDatePreset,
   parseSearchSource,
-  parseRadiusKm
+  parseRadiusKm,
+  readLocation
 } from '../lib/searchRequest.js';
 
 const SearchBodySchema = z.object({
@@ -21,7 +22,6 @@ const SearchBodySchema = z.object({
       label: z.string().trim().min(1).max(256),
       latitude: z.number(),
       longitude: z.number(),
-      pincode: z.string().trim().max(12).optional(),
       city: z.string().trim().max(80).optional()
     })
     .optional()
@@ -50,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: parseSearchMode(body.mode),
       datePreset: parseDatePreset(body.datePreset),
       radiusKm: parseRadiusKm(body.radiusKm),
-      location: body.location
+      location: readLocation(body.location)
     });
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({

@@ -42,7 +42,6 @@ export function readLocation(value: unknown): SelectedSearchLocation | undefined
     label,
     latitude,
     longitude,
-    pincode: typeof record.pincode === 'string' ? record.pincode : undefined,
     city: typeof record.city === 'string' ? record.city : undefined
   };
 }
