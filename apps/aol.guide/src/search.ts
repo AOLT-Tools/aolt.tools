@@ -1,10 +1,19 @@
-import { getSearchSuggestions } from './searchSuggestions.js';
+import {
+  COURSE_CATEGORY_ORDER,
+  COURSE_FILTER_ORDER,
+  courseCategoryLabel,
+  nextAolRadiusKm,
+  parseCourseFilter,
+  type CourseCategoryId,
+  type CourseFilterId
+} from '../lib/courseCategories.js';
 import {
   loadMapboxSearchJs,
   locationFromMapboxRetrieve,
   type BrowserLocation
 } from './mapboxSearchJs.js';
 
+type SearchSource = 'aol' | 'vvmvp' | 'vds';
 type SearchMode = 'in_person' | 'online';
 type TimePreset =
   | 'anytime'
@@ -12,11 +21,6 @@ type TimePreset =
   | 'tomorrow'
   | 'this_weekend'
   | 'next_7_days';
-
-type InterpretationRow = {
-  label: string;
-  value: string;
-};
 
 type OfficialCourseListing = {
   id: string;
@@ -35,6 +39,8 @@ type OfficialCourseListing = {
   fee: string;
   registerUrl: string;
   detailUrl: string;
+  courseTypeId?: string;
+  category?: string;
 };
 
 type SourceSearchResult = {
@@ -42,10 +48,6 @@ type SourceSearchResult = {
   label: string;
   url: string;
   filters: Record<string, string>;
-  confidence: number;
-  embeddable?: boolean;
-  reason: string;
-  unsupportedFilters: string[];
   listings?: OfficialCourseListing[];
   listingTotal?: number;
   listingError?: string;
@@ -53,80 +55,64 @@ type SourceSearchResult = {
 
 type SearchResponse = {
   success: boolean;
-  interpretation?: InterpretationRow[];
   sources?: SourceSearchResult[];
   messages?: string[];
-  usedGemini?: boolean;
   error?: { message?: string };
 };
 
+const SOURCE_STORAGE_KEY = 'aol-guide-search-source';
 const MODE_STORAGE_KEY = 'aol-guide-search-mode';
 const TIME_STORAGE_KEY = 'aol-guide-online-time';
+const CATEGORY_STORAGE_KEY = 'aol-guide-course-category';
+const FIRST_RADIUS_KM = 3;
 
-const searchForm = document.querySelector<HTMLFormElement>('#search-form');
-const searchInput = document.querySelector<HTMLInputElement>('#query');
-const searchSuggestions = document.querySelector<HTMLElement>('#search-suggestions');
 const results = document.querySelector<HTMLElement>('#results');
 const statusPill = document.querySelector<HTMLElement>('#status-pill');
 const summaryStrip = document.querySelector<HTMLElement>('#summary-strip');
-const exampleActions = document.querySelectorAll<HTMLElement>(
-  '.example-links [data-query]'
-);
+const sourceToggle = document.querySelector<HTMLElement>('#search-source');
 const modeToggle = document.querySelector<HTMLElement>('#search-mode');
 const locationControl = document.querySelector<HTMLElement>('#location-control');
 const locationHost = document.querySelector<HTMLElement>('#location-host');
 const timeControl = document.querySelector<HTMLElement>('#time-control');
 const timeSelect = document.querySelector<HTMLSelectElement>('#time-preset');
+const categoryChips = document.querySelector<HTMLElement>('#category-chips');
 
+let currentSource: SearchSource = readStoredSource();
 let currentMode: SearchMode = readStoredMode();
 let currentTimePreset: TimePreset = readStoredTime();
+let currentCategory: CourseFilterId = readStoredCategory();
 let selectedLocation: BrowserLocation | undefined;
-
-let activeSuggestionIndex = -1;
-let renderedSuggestions: string[] = [];
+let currentRadiusKm = FIRST_RADIUS_KM;
+let mergedListings: OfficialCourseListing[] = [];
+let officialUrl = '';
 
 initializeSearchPage();
 
 function initializeSearchPage() {
-  if (!searchForm || !searchInput || !results || !statusPill) {
-    return;
-  }
+  if (!results || !statusPill) return;
 
   setStatus('');
+  renderSourceToggle();
   renderModeToggle();
-  syncFilterSlot();
+  syncControls();
+  renderCategoryChips();
   if (timeSelect) timeSelect.value = currentTimePreset;
   void mountMapboxSearchBox();
+  renderIdleState();
 
-  searchForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    hideSuggestions();
-    void runSearch(searchInput.value);
-  });
-
-  searchInput.addEventListener('input', () => {
-    renderSuggestions(searchInput.value);
-  });
-
-  searchInput.addEventListener('focus', () => {
-    renderSuggestions(searchInput.value);
-  });
-
-  searchInput.addEventListener('keydown', (event) => {
-    handleSuggestionKeyboard(event);
-  });
-
-  document.addEventListener('mousedown', (event) => {
-    const target = event.target;
-    if (!(target instanceof Node) || searchForm.contains(target)) return;
-    hideSuggestions();
-  });
-
-  exampleActions.forEach((button) => {
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      fillSearchInput(button.dataset.query || '');
-    });
+  sourceToggle?.addEventListener('click', (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest('[data-source]') : null;
+    const source =
+      button instanceof HTMLElement ? parseSource(button.dataset.source) : undefined;
+    if (!source || source === currentSource) return;
+    currentSource = source;
+    persistSource(source);
+    resetListings();
+    renderSourceToggle();
+    syncControls();
+    renderCategoryChips();
+    void runCatalogSearch();
   });
 
   modeToggle?.addEventListener('click', (event) => {
@@ -136,189 +122,106 @@ function initializeSearchPage() {
     if (!mode || mode === currentMode) return;
     currentMode = mode;
     persistMode(mode);
+    resetListings();
     renderModeToggle();
-    syncFilterSlot();
-    if (searchInput.value.trim()) void runSearch(searchInput.value);
+    syncControls();
+    void runCatalogSearch();
   });
 
   timeSelect?.addEventListener('change', () => {
     currentTimePreset = parseTimePreset(timeSelect.value) || 'anytime';
     persistTime(currentTimePreset);
-    if (currentMode === 'online' && searchInput?.value.trim()) {
-      void runSearch(searchInput.value);
-    }
+    resetListings();
+    void runCatalogSearch();
+  });
+
+  categoryChips?.addEventListener('click', (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest('[data-category]') : null;
+    const category =
+      button instanceof HTMLElement
+        ? parseCourseFilter(button.dataset.category)
+        : undefined;
+    if (!category || category === currentCategory) return;
+    currentCategory = category;
+    persistCategory(category);
+    renderCategoryChips();
+    renderMergedResults();
   });
 }
 
-function renderSuggestions(value: string) {
-  if (!searchInput || !searchSuggestions) return;
+function syncControls() {
+  const courses = currentSource === 'aol';
+  const inPerson = courses && currentMode === 'in_person';
+  const online = courses && currentMode === 'online';
+  if (modeToggle) modeToggle.hidden = !courses;
+  if (locationControl) locationControl.hidden = !inPerson;
+  if (timeControl) timeControl.hidden = !online;
+  const filterSlot = document.querySelector<HTMLElement>('#filter-slot');
+  if (filterSlot) filterSlot.hidden = !inPerson && !online;
+  if (categoryChips) categoryChips.hidden = !courses;
+}
 
-  const suggestions = getSearchSuggestions(value, {
-    locationLabel: currentMode === 'in_person' ? selectedLocation?.label : undefined
-  });
-  renderedSuggestions = suggestions;
-  activeSuggestionIndex = -1;
-
-  if (!suggestions.length) {
-    hideSuggestions();
+function renderIdleState() {
+  if (!results) return;
+  if (currentSource !== 'aol') {
+    results.replaceChildren(emptyNode('Loading official programs…'));
+    void runCatalogSearch();
     return;
   }
-
-  searchSuggestions.replaceChildren(
-    ...suggestions.map((suggestion, index) =>
-      suggestionButton(suggestion, index, value)
-    )
-  );
-  searchSuggestions.hidden = false;
-  searchInput.setAttribute('aria-expanded', 'true');
-}
-
-function suggestionButton(
-  suggestion: string,
-  index: number,
-  query: string
-): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'suggestion-option';
-  button.id = 'search-suggestion-' + String(index);
-  button.setAttribute('role', 'option');
-  button.setAttribute('aria-selected', 'false');
-  button.innerHTML = highlightedSuggestion(suggestion, query);
-
-  button.addEventListener('mousedown', (event) => {
-    event.preventDefault();
-    fillSearchInput(suggestion);
-  });
-
-  return button;
-}
-
-function highlightedSuggestion(suggestion: string, query: string): string {
-  const trimmed = query.trim();
-  if (!trimmed) return escapeHtml(suggestion);
-
-  const index = suggestion.toLowerCase().indexOf(trimmed.toLowerCase());
-  if (index < 0) return escapeHtml(suggestion);
-
-  return (
-    escapeHtml(suggestion.slice(0, index)) +
-    '<strong>' +
-    escapeHtml(suggestion.slice(index, index + trimmed.length)) +
-    '</strong>' +
-    escapeHtml(suggestion.slice(index + trimmed.length))
-  );
-}
-
-function handleSuggestionKeyboard(event: KeyboardEvent) {
-  if (!searchInput || !searchSuggestions || searchSuggestions.hidden) return;
-
-  if (event.key === 'Escape') {
-    hideSuggestions();
+  if (currentMode === 'in_person' && !selectedLocation) {
+    results.replaceChildren(emptyNode('Pick a location to see programs nearby.'));
     return;
   }
-
-  if (event.key === 'ArrowDown') {
-    event.preventDefault();
-    setActiveSuggestion(
-      Math.min(activeSuggestionIndex + 1, renderedSuggestions.length - 1)
-    );
-    return;
-  }
-
-  if (event.key === 'ArrowUp') {
-    event.preventDefault();
-    setActiveSuggestion(Math.max(activeSuggestionIndex - 1, -1));
-    return;
-  }
-
-  if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
-    event.preventDefault();
-    fillSearchInput(renderedSuggestions[activeSuggestionIndex] || '');
-  }
-}
-
-function setActiveSuggestion(index: number) {
-  if (!searchInput || !searchSuggestions) return;
-
-  activeSuggestionIndex = index;
-  const options =
-    searchSuggestions.querySelectorAll<HTMLButtonElement>('.suggestion-option');
-
-  options.forEach((option, optionIndex) => {
-    option.setAttribute('aria-selected', String(optionIndex === index));
-  });
-
-  if (index >= 0) {
-    searchInput.setAttribute('aria-activedescendant', 'search-suggestion-' + index);
-  } else {
-    searchInput.removeAttribute('aria-activedescendant');
-  }
-}
-
-function fillSearchInput(query: string) {
-  if (!searchInput) return;
-  searchInput.value = query;
-  hideSuggestions();
-  searchInput.focus();
-}
-
-function hideSuggestions() {
-  if (!searchInput || !searchSuggestions) return;
-  searchSuggestions.hidden = true;
-  searchSuggestions.replaceChildren();
-  searchInput.setAttribute('aria-expanded', 'false');
-  searchInput.removeAttribute('aria-activedescendant');
-  activeSuggestionIndex = -1;
-  renderedSuggestions = [];
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => {
-    return (
-      {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      }[character] || character
-    );
-  });
-}
-
-function setStatus(label: string, state: 'idle' | 'loading' | 'error' = 'idle') {
-  if (!statusPill) return;
-  statusPill.hidden = state === 'idle' || !label;
-  statusPill.textContent = label;
-  statusPill.dataset.state = state;
+  void runCatalogSearch();
 }
 
 let searchRequestId = 0;
 let searchAbort: AbortController | null = null;
 
-async function runSearch(query: string) {
+async function runCatalogSearch(options: { append?: boolean } = {}) {
   if (!results) return;
-  const trimmed = query.trim();
-  if (!trimmed) return;
+  if (currentSource === 'aol' && currentMode === 'in_person' && !selectedLocation) {
+    results.replaceChildren(emptyNode('Pick a location to see programs nearby.'));
+    return;
+  }
 
   searchAbort?.abort();
   const controller = new AbortController();
   searchAbort = controller;
   const requestId = ++searchRequestId;
+  const radiusKm =
+    currentSource === 'aol' && currentMode === 'in_person'
+      ? options.append
+        ? currentRadiusKm
+        : FIRST_RADIUS_KM
+      : undefined;
+  if (radiusKm && !options.append) currentRadiusKm = radiusKm;
 
   setStatus('Searching…', 'loading');
-  if (summaryStrip) summaryStrip.hidden = true;
-  results.replaceChildren(emptyNode('Searching…'));
+  if (!options.append) {
+    if (summaryStrip) summaryStrip.hidden = true;
+    results.replaceChildren(emptyNode('Searching…'));
+  }
 
   try {
-    const payload = await fetchSearch(trimmed, controller.signal);
+    const payload = await fetchCatalog(controller.signal, radiusKm);
     if (requestId !== searchRequestId) return;
     if (!payload.success) {
       throw new Error(payload.error?.message || 'Search failed.');
     }
-    renderMessages(payload.messages || []);
-    renderSources(payload.sources || []);
+    const source = payload.sources?.[0];
+    officialUrl = source?.url || '';
+    const incoming = source?.listings || [];
+    mergedListings = options.append
+      ? mergeListings(mergedListings, incoming)
+      : incoming;
+    if (source?.listingError && !mergedListings.length) {
+      results.replaceChildren(emptyNode(source.listingError));
+    } else {
+      renderMessages(payload.messages || []);
+      renderMergedResults(source);
+    }
     setStatus('');
   } catch (error) {
     if (controller.signal.aborted || requestId !== searchRequestId) return;
@@ -329,19 +232,26 @@ async function runSearch(query: string) {
   }
 }
 
-async function fetchSearch(
-  query: string,
-  signal: AbortSignal
+async function fetchCatalog(
+  signal: AbortSignal,
+  radiusKm?: number
 ): Promise<SearchResponse> {
   const response = await fetch('/api/search', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     signal,
     body: JSON.stringify({
-      query,
-      mode: currentMode,
-      datePreset: currentMode === 'online' ? currentTimePreset : undefined,
-      location: currentMode === 'in_person' ? searchLocationCoords(selectedLocation) : undefined
+      source: currentSource,
+      mode: currentSource === 'aol' ? currentMode : undefined,
+      datePreset:
+        currentSource === 'aol' && currentMode === 'online'
+          ? currentTimePreset
+          : undefined,
+      radiusKm,
+      location:
+        currentSource === 'aol' && currentMode === 'in_person'
+          ? searchLocationCoords(selectedLocation)
+          : undefined
     })
   });
   const contentType = response.headers.get('content-type') || '';
@@ -354,6 +264,175 @@ async function fetchSearch(
   return (await response.json()) as SearchResponse;
 }
 
+function mergeListings(
+  existing: OfficialCourseListing[],
+  incoming: OfficialCourseListing[]
+): OfficialCourseListing[] {
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  for (const item of incoming) {
+    const previous = byId.get(item.id);
+    if (!previous || closerListing(item, previous)) byId.set(item.id, item);
+  }
+  return [...byId.values()].sort((left, right) => {
+    if (isFiniteDistance(left.distanceKm) && isFiniteDistance(right.distanceKm)) {
+      return left.distanceKm - right.distanceKm;
+    }
+    if (isFiniteDistance(left.distanceKm)) return -1;
+    if (isFiniteDistance(right.distanceKm)) return 1;
+    return 0;
+  });
+}
+
+function closerListing(
+  candidate: OfficialCourseListing,
+  current: OfficialCourseListing
+): boolean {
+  if (!isFiniteDistance(candidate.distanceKm)) return false;
+  if (!isFiniteDistance(current.distanceKm)) return true;
+  return candidate.distanceKm < current.distanceKm;
+}
+
+function isFiniteDistance(value: number | null): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function listingCategory(item: OfficialCourseListing): CourseCategoryId {
+  return COURSE_CATEGORY_ORDER.includes(item.category as CourseCategoryId)
+    ? (item.category as CourseCategoryId)
+    : 'other';
+}
+
+function visibleListings(): OfficialCourseListing[] {
+  if (currentCategory === 'all') return mergedListings;
+  return mergedListings.filter((item) => listingCategory(item) === currentCategory);
+}
+
+function categoryCount(id: CourseFilterId): number {
+  if (id === 'all') return mergedListings.length;
+  return mergedListings.filter((item) => listingCategory(item) === id).length;
+}
+
+function renderCategoryChips() {
+  if (!categoryChips) return;
+  const searched = mergedListings.length > 0;
+  const chips = COURSE_FILTER_ORDER.map((id) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'category-chip';
+    button.dataset.category = id;
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-selected', String(id === currentCategory));
+    if (
+      searched &&
+      id !== currentCategory &&
+      id !== 'all' &&
+      categoryCount(id) === 0
+    ) {
+      button.classList.add('category-chip-empty');
+    }
+    button.textContent = courseCategoryLabel(id);
+    return button;
+  });
+  const scroll = document.createElement('div');
+  scroll.className = 'category-chips-scroll';
+  scroll.append(...chips.filter((chip) => chip.dataset.category !== 'all'));
+  const allChip = chips.find((chip) => chip.dataset.category === 'all');
+  categoryChips.replaceChildren(scroll, ...(allChip ? [allChip] : []));
+}
+
+function renderMergedResults(source?: SourceSearchResult) {
+  if (!results) return;
+  renderCategoryChips();
+
+  if (currentSource !== 'aol') {
+    if (source?.listingError) {
+      results.replaceChildren(emptyNode(source.listingError));
+      return;
+    }
+    results.replaceChildren(
+      source ? renderOfficialLinkCard(source) : emptyNode('No programs found.')
+    );
+    return;
+  }
+
+  const listings = visibleListings();
+  const nodes: HTMLElement[] = [];
+  nodes.push(resultsMetaNode(listings.length));
+
+  if (!listings.length) {
+    nodes.push(
+      emptyNode(
+        currentMode === 'in_person'
+          ? 'No ' +
+              courseCategoryLabel(currentCategory).toLowerCase() +
+              ' programs within ' +
+              String(currentRadiusKm) +
+              ' km.'
+          : 'No ' +
+              courseCategoryLabel(currentCategory).toLowerCase() +
+              ' programs in this date range.'
+      )
+    );
+  } else if (currentCategory === 'all') {
+    for (const category of COURSE_CATEGORY_ORDER) {
+      const group = listings.filter((item) => listingCategory(item) === category);
+      if (!group.length) continue;
+      const heading = document.createElement('h2');
+      heading.className = 'category-heading';
+      heading.textContent = courseCategoryLabel(category);
+      nodes.push(heading);
+      for (const listing of group) nodes.push(renderListingCard(listing));
+    }
+  } else {
+    for (const listing of listings) nodes.push(renderListingCard(listing));
+  }
+
+  const nextRadius = nextShowMoreRadius();
+  if (nextRadius) nodes.push(showMoreButton(nextRadius));
+  else if (officialUrl) nodes.push(moreResultsLink(officialUrl));
+
+  results.replaceChildren(...nodes);
+}
+
+function resultsMetaNode(count: number): HTMLElement {
+  const meta = document.createElement('div');
+  meta.className = 'results-meta';
+  const label = courseCategoryLabel(currentCategory);
+  if (currentMode === 'in_person') {
+    const place = selectedLocation?.city || selectedLocation?.label || 'this location';
+    meta.textContent =
+      label +
+      ' · within ' +
+      String(currentRadiusKm) +
+      ' km · ' +
+      place +
+      ' · ' +
+      String(count) +
+      (count === 1 ? ' program' : ' programs');
+  } else {
+    meta.textContent =
+      label + ' · ' + String(count) + (count === 1 ? ' program' : ' programs');
+  }
+  return meta;
+}
+
+function nextShowMoreRadius(): number | undefined {
+  if (currentSource !== 'aol' || currentMode !== 'in_person') return undefined;
+  return nextAolRadiusKm(currentRadiusKm);
+}
+
+function showMoreButton(radiusKm: number): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'more-link';
+  button.textContent = 'Show more within ' + String(radiusKm) + ' km';
+  button.addEventListener('click', () => {
+    currentRadiusKm = radiusKm;
+    void runCatalogSearch({ append: true });
+  });
+  return button;
+}
+
 function renderMessages(messages: string[]) {
   if (!summaryStrip) return;
   if (!messages.length) {
@@ -362,55 +441,6 @@ function renderMessages(messages: string[]) {
   }
   summaryStrip.textContent = messages.join(' ');
   summaryStrip.hidden = false;
-}
-
-function renderSources(items: SourceSearchResult[]) {
-  if (!results) return;
-  if (!items.length) {
-    results.replaceChildren(emptyNode('No matching programs. Try another search.'));
-    return;
-  }
-
-  const nodes: HTMLElement[] = [];
-  let moreUrl = '';
-
-  for (const item of items) {
-    const listings = item.listings || [];
-    if (listings.length) {
-      for (const listing of listings) {
-        nodes.push(renderListingCard(listing));
-      }
-      if (
-        typeof item.listingTotal === 'number' &&
-        item.listingTotal > listings.length
-      ) {
-        moreUrl = item.url;
-      }
-      continue;
-    }
-
-    if (item.listingError) {
-      nodes.push(emptyNode(item.listingError));
-      continue;
-    }
-
-    if (
-      item.source === 'aol' &&
-      typeof item.listingTotal === 'number' &&
-      item.listingTotal === 0
-    ) {
-      nodes.push(emptyNode('No matching programs nearby.'));
-      continue;
-    }
-
-    nodes.push(renderOfficialLinkCard(item));
-  }
-
-  if (moreUrl) {
-    nodes.push(moreResultsLink(moreUrl));
-  }
-
-  results.replaceChildren(...nodes);
 }
 
 function renderOfficialLinkCard(item: SourceSearchResult): HTMLElement {
@@ -521,16 +551,13 @@ function makeCardClickable(card: HTMLElement, url: string) {
   card.dataset.clickable = 'true';
   card.tabIndex = 0;
   card.setAttribute('role', 'link');
-
   const open = () => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
-
   card.addEventListener('click', (event) => {
     if (event.target instanceof HTMLAnchorElement) return;
     open();
   });
-
   card.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -559,16 +586,29 @@ function emptyNode(label: string): HTMLElement {
   return empty;
 }
 
+function resetListings() {
+  mergedListings = [];
+  officialUrl = '';
+  currentRadiusKm = FIRST_RADIUS_KM;
+}
+
+function renderSourceToggle() {
+  sourceToggle?.querySelectorAll<HTMLButtonElement>('[data-source]').forEach((button) => {
+    button.setAttribute('aria-checked', String(button.dataset.source === currentSource));
+  });
+}
+
 function renderModeToggle() {
   modeToggle?.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
     button.setAttribute('aria-checked', String(button.dataset.mode === currentMode));
   });
 }
 
-function syncFilterSlot() {
-  const inPerson = currentMode === 'in_person';
-  if (locationControl) locationControl.hidden = !inPerson;
-  if (timeControl) timeControl.hidden = inPerson;
+function setStatus(label: string, state: 'idle' | 'loading' | 'error' = 'idle') {
+  if (!statusPill) return;
+  statusPill.hidden = state === 'idle' || !label;
+  statusPill.textContent = label;
+  statusPill.dataset.state = state;
 }
 
 async function mountMapboxSearchBox() {
@@ -583,7 +623,7 @@ async function mountMapboxSearchBox() {
     const searchJs = await loadMapboxSearchJs();
     const box = new searchJs.MapboxSearchBox();
     box.accessToken = token;
-    box.placeholder = 'Location';
+    box.placeholder = 'Pick a location';
     box.options = { language: 'en', country: 'IN' };
     box.theme = {
       variables: {
@@ -601,7 +641,8 @@ async function mountMapboxSearchBox() {
       },
       cssText: [
         '.SearchBox{background:transparent;border:none;box-shadow:none;border-radius:0;min-width:0;width:100%;}',
-        '.Input{background:transparent;color:#0f172a;padding:0.15em;}',
+        '.SearchIcon{display:none;}',
+        '.Input{background:transparent;color:#0f172a;padding:0.15em 0;}',
         '.Results,.ResultsList,.Suggestion{background:#ffffff;opacity:1;}',
         '.Results{color:#0f172a;}',
         '.SuggestionName,.SuggestionText,.Label{color:#0f172a;}',
@@ -610,10 +651,13 @@ async function mountMapboxSearchBox() {
     };
     box.addEventListener('retrieve', (event: Event) => {
       selectedLocation = locationFromMapboxRetrieve((event as CustomEvent).detail);
-      if (searchInput?.value.trim()) void runSearch(searchInput.value);
+      resetListings();
+      void runCatalogSearch();
     });
     box.addEventListener('clear', () => {
       selectedLocation = undefined;
+      resetListings();
+      renderIdleState();
     });
     locationHost.replaceChildren(box);
   } catch (error) {
@@ -632,6 +676,10 @@ function searchLocationCoords(location: BrowserLocation | undefined) {
   };
 }
 
+function parseSource(value: string | undefined): SearchSource | undefined {
+  return value === 'aol' || value === 'vvmvp' || value === 'vds' ? value : undefined;
+}
+
 function parseMode(value: string | undefined): SearchMode | undefined {
   return value === 'online' || value === 'in_person' ? value : undefined;
 }
@@ -644,6 +692,22 @@ function parseTimePreset(value: string | undefined): TimePreset | undefined {
     value === 'next_7_days'
     ? value
     : undefined;
+}
+
+function readStoredSource(): SearchSource {
+  try {
+    return parseSource(localStorage.getItem(SOURCE_STORAGE_KEY) || '') || 'aol';
+  } catch {
+    return 'aol';
+  }
+}
+
+function persistSource(source: SearchSource) {
+  try {
+    localStorage.setItem(SOURCE_STORAGE_KEY, source);
+  } catch {
+    // Ignore storage failures; the selected catalogue still applies for this visit.
+  }
 }
 
 function readStoredMode(): SearchMode {
@@ -675,5 +739,21 @@ function persistTime(preset: TimePreset) {
     localStorage.setItem(TIME_STORAGE_KEY, preset);
   } catch {
     // Ignore storage failures; the selected range still applies for this visit.
+  }
+}
+
+function readStoredCategory(): CourseFilterId {
+  try {
+    return parseCourseFilter(localStorage.getItem(CATEGORY_STORAGE_KEY) || '') || 'beginner';
+  } catch {
+    return 'beginner';
+  }
+}
+
+function persistCategory(category: CourseFilterId) {
+  try {
+    localStorage.setItem(CATEGORY_STORAGE_KEY, category);
+  } catch {
+    // Ignore storage failures; the selected category still applies for this visit.
   }
 }

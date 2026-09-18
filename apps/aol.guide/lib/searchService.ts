@@ -14,10 +14,12 @@ import {
 import type { PincodeCoordinateResolver } from './pincodeCoordinates.js';
 import type {
   ResolvedSearchIntent,
+  SearchSourceId,
   SourceSearchResult
 } from './searchIntent.js';
 import {
   fetchAolCourseListings,
+  fetchAolListingsForRadius,
   refineAolListingPage,
   type AolListingPage
 } from './sources/aolListings.js';
@@ -39,10 +41,12 @@ export type SelectedSearchLocation = {
 };
 
 export type OfficialSearchRequest = {
-  query: string;
+  query?: string;
+  source?: SearchSourceId;
   mode?: SearchMode;
   location?: SelectedSearchLocation;
   datePreset?: OnlineTimePreset;
+  radiusKm?: number;
 };
 
 export type OfficialSearchServiceOptions = {
@@ -69,7 +73,16 @@ export class OfficialSearchService {
     input: string | OfficialSearchRequest
   ): Promise<OfficialSearchResponse> {
     const request = normalizeSearchRequest(input);
-    const trimmed = request.query;
+    if (request.source) {
+      return this.searchCatalog(request);
+    }
+    return this.searchQuery(request);
+  }
+
+  private async searchQuery(
+    request: OfficialSearchRequest
+  ): Promise<OfficialSearchResponse> {
+    const trimmed = request.query || '';
     const now = this.options.now || new Date();
     let intent = parseSearchQuery(trimmed, { now });
     let usedGemini = false;
@@ -121,6 +134,62 @@ export class OfficialSearchService {
       usedGemini,
       messages
     };
+  }
+
+  private async searchCatalog(
+    request: OfficialSearchRequest
+  ): Promise<OfficialSearchResponse> {
+    const now = this.options.now || new Date();
+    const sourceId = request.source || 'aol';
+    const intent = catalogIntent(request, now);
+    const adapter = SEARCH_SOURCE_ADAPTERS.find((item) => item.id === sourceId);
+    const messages = [...intent.messages];
+    if (!adapter) {
+      return {
+        query: '',
+        intent,
+        interpretation: describeIntent(intent, request.location),
+        sources: [],
+        usedGemini: false,
+        messages
+      };
+    }
+
+    const source = adapter.buildResult(intent, now);
+    if (sourceId === 'aol') {
+      await this.attachCatalogListings(source, intent, now, messages);
+    }
+
+    return {
+      query: '',
+      intent,
+      interpretation: describeIntent(intent, request.location),
+      sources: [source],
+      usedGemini: false,
+      messages
+    };
+  }
+
+  private async attachCatalogListings(
+    source: SourceSearchResult,
+    intent: ResolvedSearchIntent,
+    now: Date,
+    messages: string[]
+  ): Promise<void> {
+    try {
+      const page = await fetchAolListingsForRadius(buildAolFilters(intent, now), {
+        fetchImpl: this.options.fetchImpl,
+        limit: this.options.aolListingLimit
+      });
+      applyAolListingResult(source, intent, page, now);
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : 'Could not load Art of Living listings.';
+      source.listingError = detail;
+      messages.push(
+        'Official Art of Living listings could not be loaded. Use View official results to open the same search on artofliving.org.'
+      );
+    }
   }
 
   private async attachOfficialListings(
@@ -313,11 +382,40 @@ function normalizeSearchRequest(
     return { query: input.trim() };
   }
   return {
-    query: input.query.trim(),
+    query: (input.query || '').trim(),
+    source: input.source,
     mode: input.mode,
     location: input.location,
-    datePreset: input.datePreset
+    datePreset: input.datePreset,
+    radiusKm: input.radiusKm
   };
+}
+
+function catalogIntent(
+  request: OfficialSearchRequest,
+  now: Date
+): ResolvedSearchIntent {
+  const source = request.source || 'aol';
+  const mode = source === 'aol' ? request.mode || 'in_person' : 'in_person';
+  const intent: ResolvedSearchIntent = applySearchControls(
+    {
+      rawQuery: '',
+      source,
+      confidence: 'high',
+      courseTypeIds: [],
+      ashramMentioned: source === 'vvmvp',
+      vdsMentioned: source === 'vds',
+      courseMentioned: source === 'aol',
+      pincodeResolved: false,
+      messages: []
+    },
+    { ...request, mode },
+    now
+  );
+  if (mode === 'in_person' && typeof request.radiusKm === 'number') {
+    return { ...intent, radiusKm: request.radiusKm };
+  }
+  return intent;
 }
 
 export function applySearchControls(
@@ -355,7 +453,12 @@ export function applySearchControls(
       city: location.city || location.label,
       pincode: undefined,
       pincodeResolved: true,
-      radiusKm: typeof next.radiusKm === 'number' ? next.radiusKm : 10
+      radiusKm:
+        typeof request.radiusKm === 'number'
+          ? request.radiusKm
+          : typeof next.radiusKm === 'number'
+            ? next.radiusKm
+            : 10
     };
   }
   return next;

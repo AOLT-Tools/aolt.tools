@@ -358,4 +358,31 @@ describe('official search service', () => {
     expect(requested[0]).toContain('start_date_from=2026-09-04');
     expect(requested[0]).toContain('start_date_to=2026-09-04');
   });
+
+  it('searches the Courses catalogue by Mapbox location at 3 km without NLP', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock([sampleAolCourse()], 1, requested)
+    });
+    const result = await service.search({
+      source: 'aol',
+      mode: 'in_person',
+      radiusKm: 3,
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446,
+        city: 'Bengaluru'
+      }
+    });
+    expect(result.usedGemini).toBe(false);
+    expect(result.intent.courseTypeIds).toEqual([]);
+    expect(result.intent.radiusKm).toBe(3);
+    expect(requested[0]).toContain('lat=12.9121');
+    expect(requested[0]).toContain('distance=3');
+    expect(requested[0]).not.toContain('ctype=');
+    expect(result.sources[0]?.listings?.[0]?.category).toBe('beginner');
+  });
 });

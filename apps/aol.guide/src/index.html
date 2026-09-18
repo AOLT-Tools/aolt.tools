@@ -44,70 +44,42 @@
 
     <main class="mx-auto w-full max-w-[430px] px-4 pb-10">
       <section class="pt-4" aria-label="Search">
-        <form id="search-form" role="search">
-          <label for="query" class="sr-only">Search programs near you</label>
-          <div class="relative">
-            <span
-              class="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-slate-400"
-              aria-hidden="true"
-            >
-              <svg
-                class="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="11" cy="11" r="8"></circle>
-                <path d="m21 21-4.35-4.35"></path>
-              </svg>
-            </span>
-
-            <input
-              id="query"
-              name="query"
-              type="search"
-              autocomplete="off"
-              enterkeyhint="search"
-              placeholder="HP near 560045"
-              aria-controls="search-suggestions"
-              aria-expanded="false"
-              required
-              class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pr-14 pl-11 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#1b3a6e]/40 focus:bg-white focus:ring-4 focus:ring-[#1b3a6e]/10"
-            />
-
-            <button
-              type="submit"
-              aria-label="Search"
-              class="absolute top-1/2 right-1 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl bg-[#ee6b1f] text-white transition active:scale-95"
-            >
-              <svg
-                class="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M5 12h14"></path>
-                <path d="m14 7 5 5-5 5"></path>
-              </svg>
-            </button>
-
-            <div
-              class="suggestions"
-              id="search-suggestions"
-              role="listbox"
-              hidden
-            ></div>
-          </div>
-        </form>
-
         <div class="filter-bar">
+          <div
+            class="source-toggle"
+            id="search-source"
+            role="radiogroup"
+            aria-label="Search catalogue"
+          >
+            <button
+              type="button"
+              class="source-option"
+              role="radio"
+              aria-checked="true"
+              data-source="aol"
+            >
+              Courses
+            </button>
+            <button
+              type="button"
+              class="source-option"
+              role="radio"
+              aria-checked="false"
+              data-source="vvmvp"
+            >
+              Ashram
+            </button>
+            <button
+              type="button"
+              class="source-option"
+              role="radio"
+              aria-checked="false"
+              data-source="vds"
+            >
+              Puja
+            </button>
+          </div>
+
           <div
             class="mode-toggle"
             id="search-mode"
@@ -133,54 +105,107 @@
               Online
             </button>
           </div>
+        </div>
 
-          <div class="filter-slot" id="filter-slot">
-            <div class="filter-control" id="location-control">
-              <span class="filter-icon" aria-hidden="true">📍</span>
-              <div class="filter-control-body" id="location-host">
-                <input
-                  id="location-fallback"
-                  class="filter-input"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="Location"
-                  disabled
-                />
-              </div>
+        <div class="filter-slot mt-1.5" id="filter-slot">
+          <div class="filter-control" id="location-control">
+            <span class="filter-icon" aria-hidden="true">📍</span>
+            <div class="filter-control-body" id="location-host">
+              <input
+                id="location-fallback"
+                class="filter-input"
+                type="text"
+                autocomplete="off"
+                placeholder="Pick a location"
+                disabled
+              />
             </div>
+          </div>
 
-            <div class="filter-control" id="time-control" hidden>
-              <span class="filter-icon" aria-hidden="true">🕐</span>
-              <label for="time-preset" class="sr-only">Course dates</label>
-              <select id="time-preset" class="filter-select">
-                <option value="anytime">Anytime</option>
-                <option value="today">Today</option>
-                <option value="tomorrow">Tomorrow</option>
-                <option value="this_weekend">This weekend</option>
-                <option value="next_7_days">Next 7 days</option>
-              </select>
-            </div>
+          <div class="filter-control" id="time-control" hidden>
+            <span class="filter-icon" aria-hidden="true">🕐</span>
+            <label for="time-preset" class="sr-only">Course dates</label>
+            <select id="time-preset" class="filter-select">
+              <option value="anytime">Anytime</option>
+              <option value="today">Today</option>
+              <option value="tomorrow">Tomorrow</option>
+              <option value="this_weekend">This weekend</option>
+              <option value="next_7_days">Next 7 days</option>
+            </select>
           </div>
         </div>
 
         <div
-          class="example-links -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          aria-label="Quick searches"
+          class="category-chips"
+          id="category-chips"
+          role="tablist"
+          aria-label="Course category"
         >
-          <a class="search-chip" href="#" data-query="HP near 560045 within 10km"
-            >Nearby</a
+          <div class="category-chips-scroll">
+            <button
+              type="button"
+              class="category-chip"
+              role="tab"
+              aria-selected="true"
+              data-category="beginner"
+            >
+              Beginner
+            </button>
+            <button
+              type="button"
+              class="category-chip"
+              role="tab"
+              aria-selected="false"
+              data-category="kids"
+            >
+              Kids
+            </button>
+            <button
+              type="button"
+              class="category-chip"
+              role="tab"
+              aria-selected="false"
+              data-category="yoga"
+            >
+              Yoga
+            </button>
+            <button
+              type="button"
+              class="category-chip"
+              role="tab"
+              aria-selected="false"
+              data-category="advanced"
+            >
+              Advanced
+            </button>
+            <button
+              type="button"
+              class="category-chip"
+              role="tab"
+              aria-selected="false"
+              data-category="follow_up"
+            >
+              Follow-up
+            </button>
+            <button
+              type="button"
+              class="category-chip"
+              role="tab"
+              aria-selected="false"
+              data-category="other"
+            >
+              Other
+            </button>
+          </div>
+          <button
+            type="button"
+            class="category-chip"
+            role="tab"
+            aria-selected="false"
+            data-category="all"
           >
-          <a class="search-chip" href="#" data-query="HP 560045 Hindi this weekend"
-            >Weekend</a
-          >
-          <a class="search-chip" href="#" data-query="AMP Bangalore Ashram next weekend"
-            >Ashram</a
-          >
-          <a class="search-chip" href="#" data-query="Rudra Puja this weekend">Puja</a>
-          <a class="search-chip" href="#" data-query="Intuition near 560001"
-            >Intuition</a
-          >
-          <a class="search-chip" href="#" data-query="HP online">Online</a>
+            All
+          </button>
         </div>
       </section>
 

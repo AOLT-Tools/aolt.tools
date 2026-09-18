@@ -1,14 +1,21 @@
 import { z } from 'zod';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createOfficialSearchService } from '../lib/factory.js';
-import { parseSearchMode, parseDatePreset } from '../lib/searchRequest.js';
+import {
+  parseSearchMode,
+  parseDatePreset,
+  parseSearchSource,
+  parseRadiusKm
+} from '../lib/searchRequest.js';
 
 const SearchBodySchema = z.object({
-  query: z.string().trim().min(1),
+  query: z.string().trim().optional().default(''),
+  source: z.enum(['aol', 'vvmvp', 'vds']).optional(),
   mode: z.enum(['in_person', 'online']).optional(),
   datePreset: z
     .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days'])
     .optional(),
+  radiusKm: z.number().positive().max(250).optional(),
   location: z
     .object({
       label: z.string().trim().min(1).max(256),
@@ -31,10 +38,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = SearchBodySchema.parse(readBody(req));
+    if (!body.source && !body.query) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Query is required.' }
+      });
+    }
     const result = await createOfficialSearchService().search({
       query: body.query,
+      source: parseSearchSource(body.source),
       mode: parseSearchMode(body.mode),
       datePreset: parseDatePreset(body.datePreset),
+      radiusKm: parseRadiusKm(body.radiusKm),
       location: body.location
     });
     res.setHeader('Cache-Control', 'no-store');

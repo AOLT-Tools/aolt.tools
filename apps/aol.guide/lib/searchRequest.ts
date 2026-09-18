@@ -1,8 +1,22 @@
 import type { OnlineTimePreset } from './dateRanges.js';
-import type { SearchMode, SelectedSearchLocation } from './searchService.js';
+import type {
+  SearchMode,
+  SelectedSearchLocation
+} from './searchService.js';
+import type { SearchSourceId } from './searchIntent.js';
 
 export function parseSearchMode(value: unknown): SearchMode | undefined {
   return value === 'online' || value === 'in_person' ? value : undefined;
+}
+
+export function parseSearchSource(value: unknown): SearchSourceId | undefined {
+  return value === 'aol' || value === 'vvmvp' || value === 'vds' ? value : undefined;
+}
+
+export function parseRadiusKm(value: unknown): number | undefined {
+  const radius = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(radius) || radius <= 0 || radius > 250) return undefined;
+  return radius;
 }
 
 export function parseDatePreset(value: unknown): OnlineTimePreset | undefined {

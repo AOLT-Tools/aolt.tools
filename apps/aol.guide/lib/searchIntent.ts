@@ -55,6 +55,8 @@ export type OfficialCourseListing = {
   fee: string;
   registerUrl: string;
   detailUrl: string;
+  courseTypeId?: string;
+  category?: string;
 };
 
 export type SourceSearchResult = {

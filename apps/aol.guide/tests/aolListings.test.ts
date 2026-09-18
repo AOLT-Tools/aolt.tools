@@ -54,7 +54,9 @@ describe('Art of Living live listings', () => {
       isOnline: false,
       languages: ['English'],
       teachers: [],
-      fee: '₹2500'
+      fee: '₹2500',
+      courseTypeId: '74889',
+      category: 'beginner'
     });
     expect(listing?.registerUrl).toContain('artofliving.online');
     expect(listing?.detailUrl).toBe(

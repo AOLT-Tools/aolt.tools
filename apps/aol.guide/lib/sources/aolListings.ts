@@ -1,3 +1,4 @@
+import { categorizeCourse } from '../courseCategories.js';
 import type {
   DeliveryMode,
   OfficialCourseListing,
@@ -6,6 +7,7 @@ import type {
 
 export const AOL_COURSE_API_URL = 'https://www.artofliving.org/new-search-course';
 export const AOL_LISTING_PAGE_SIZE = 20;
+export const AOL_MAX_RING_PAGES = 5;
 
 const HASH_ONLY_KEYS = new Set(['selectedLocName', 'mode']);
 
@@ -120,16 +122,18 @@ export function normalizeAolListing(raw: unknown): OfficialCourseListing | null 
   const address = readString(record.address_short) || readString(record.address);
   const pincode = readString(record.zip_postal_code);
   const isOnline = record.is_online_event === 1 || record.is_online_event === '1';
-  const weekday = readString(record.weekday_timings);
+    const weekday = readString(record.weekday_timings);
   const weekend = readString(record.weekend_timings);
   const timings =
     weekday && weekend && weekday === weekend
       ? weekday
       : compactJoin([weekday, weekend], ' / ');
+  const courseTypeId = readString(record.ctype) || undefined;
+  const displayTitle = title || 'Art of Living program';
 
   return {
     id: id || registerUrl || title,
-    title: title || 'Art of Living program',
+    title: displayTitle,
     startDate,
     endDate: endDate === startDate ? '' : endDate,
     city,
@@ -149,8 +153,50 @@ export function normalizeAolListing(raw: unknown): OfficialCourseListing | null 
     ),
     fee: formatFee(record.course_fee, record.currency),
     registerUrl,
-    detailUrl
+    detailUrl,
+    courseTypeId,
+    category: categorizeCourse({ title: displayTitle, courseTypeId })
   };
+}
+
+export async function fetchAolListingsForRadius(
+  filters: Record<string, string>,
+  options: FetchAolListingsOptions = {}
+): Promise<AolListingPage> {
+  const pageSize = options.limit || AOL_LISTING_PAGE_SIZE;
+  const maxPages = AOL_MAX_RING_PAGES;
+  const byId = new Map<string, OfficialCourseListing>();
+  let total = 0;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    const result = await fetchAolCourseListings(filters, {
+      ...options,
+      limit: pageSize,
+      offset: page
+    });
+    total = result.total;
+    for (const listing of result.listings) {
+      const previous = byId.get(listing.id);
+      if (!previous || closerListing(listing, previous)) {
+        byId.set(listing.id, listing);
+      }
+    }
+    if (result.listings.length < pageSize) break;
+  }
+
+  return {
+    listings: sortListingsByDistance([...byId.values()]),
+    total
+  };
+}
+
+function closerListing(
+  candidate: OfficialCourseListing,
+  current: OfficialCourseListing
+): boolean {
+  if (!isFiniteDistance(candidate.distanceKm)) return false;
+  if (!isFiniteDistance(current.distanceKm)) return true;
+  return candidate.distanceKm < current.distanceKm;
 }
 
 export function sortListingsByDistance(

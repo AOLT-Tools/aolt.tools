@@ -79,9 +79,18 @@ function attachSearchApi(server: {
     }
 
     try {
-      const body = JSON.parse(await readBody(req));
+      const body = JSON.parse(await readBody(req)) as Record<string, unknown>;
       const query = String(body.query || '').trim();
-      if (!query) {
+      const { createOfficialSearchService } = await import('./lib/factory.ts');
+      const {
+        parseSearchMode,
+        parseDatePreset,
+        parseSearchSource,
+        parseRadiusKm,
+        readLocation
+      } = await import('./lib/searchRequest.ts');
+      const source = parseSearchSource(body.source);
+      if (!source && !query) {
         res.statusCode = 400;
         res.setHeader('content-type', 'application/json');
         res.end(
@@ -89,14 +98,12 @@ function attachSearchApi(server: {
         );
         return;
       }
-      const { createOfficialSearchService } = await import('./lib/factory.ts');
-      const { parseSearchMode, parseDatePreset, readLocation } = await import(
-        './lib/searchRequest.ts'
-      );
       const result = await createOfficialSearchService().search({
         query,
+        source,
         mode: parseSearchMode(body.mode),
         datePreset: parseDatePreset(body.datePreset),
+        radiusKm: parseRadiusKm(body.radiusKm),
         location: readLocation(body.location)
       });
       res.statusCode = 200;
