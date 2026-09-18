@@ -10,21 +10,32 @@
   }
 
   .source-toggle {
-    @apply grid min-w-0 flex-1 grid-cols-3 rounded-full bg-slate-100 p-0.5;
+    @apply grid min-w-0 flex-1 grid-cols-3 rounded-full bg-[#d7e3f4] p-0.5;
   }
 
   .source-option,
   .mode-option {
-    @apply h-8 cursor-pointer rounded-full border-0 bg-transparent px-1.5 text-[11px] font-semibold whitespace-nowrap text-slate-600;
+    @apply h-8 cursor-pointer rounded-full border-0 bg-transparent px-1.5 text-[11px] font-semibold whitespace-nowrap;
   }
 
-  .source-option[aria-checked='true'],
-  .mode-option[aria-checked='true'] {
+  .source-option {
+    @apply text-[#1b3a6e];
+  }
+
+  .mode-option {
+    @apply text-[#9a3412];
+  }
+
+  .source-option[aria-checked='true'] {
     @apply bg-white text-[#1b3a6e] shadow-sm;
   }
 
+  .mode-option[aria-checked='true'] {
+    @apply bg-white text-[#c2410c] shadow-sm;
+  }
+
   .mode-toggle {
-    @apply grid w-[9.25rem] shrink-0 grid-cols-2 rounded-full bg-slate-100 p-0.5;
+    @apply grid w-[9.25rem] shrink-0 grid-cols-2 rounded-full bg-[#fde4d4] p-0.5;
   }
 
   .mode-toggle[hidden] {
@@ -74,6 +85,16 @@
     min-width: 0;
     position: relative;
     z-index: 30;
+    outline: none;
+    box-shadow: none;
+  }
+
+  .filter-control:focus-within,
+  .filter-control-body mapbox-search-box:focus,
+  .filter-control-body mapbox-search-box:focus-visible,
+  .filter-control-body mapbox-search-box:focus-within {
+    outline: none;
+    box-shadow: none;
   }
 
   .search-chip {
@@ -85,26 +106,18 @@
   }
 
   .category-chips {
-    @apply mt-3 flex items-center gap-1.5;
+    @apply mt-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
   }
 
   .category-chips[hidden] {
     display: none !important;
   }
 
-  .category-chips-scroll {
-    @apply flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
-  }
-
   .category-chip {
     @apply inline-flex min-h-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-[13px] font-semibold whitespace-nowrap text-slate-700;
   }
 
-  .category-chip-empty {
-    @apply border-slate-100 bg-slate-50 text-slate-400;
-  }
-
-  .category-chip[aria-selected='true'] {
+  .category-chip[aria-pressed='true'] {
     @apply border-[#1b3a6e]/30 bg-[#1b3a6e] text-white;
   }
 

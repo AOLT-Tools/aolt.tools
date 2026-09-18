@@ -1,11 +1,12 @@
 import {
   COURSE_CATEGORY_ORDER,
-  COURSE_FILTER_ORDER,
   courseCategoryLabel,
   nextAolRadiusKm,
+  parseCourseCategories,
   parseCourseFilter,
-  type CourseCategoryId,
-  type CourseFilterId
+  presentCourseCategories,
+  serializeCourseCategories,
+  type CourseCategoryId
 } from '../lib/courseCategories.js';
 import {
   loadMapboxSearchJs,
@@ -80,7 +81,7 @@ const categoryChips = document.querySelector<HTMLElement>('#category-chips');
 let currentSource: SearchSource = readStoredSource();
 let currentMode: SearchMode = readStoredMode();
 let currentTimePreset: TimePreset = readStoredTime();
-let currentCategory: CourseFilterId = readStoredCategory();
+let selectedCategories = new Set<CourseCategoryId>(readStoredCategories());
 let selectedLocation: BrowserLocation | undefined;
 let currentRadiusKm = FIRST_RADIUS_KM;
 let mergedListings: OfficialCourseListing[] = [];
@@ -142,9 +143,10 @@ function initializeSearchPage() {
       button instanceof HTMLElement
         ? parseCourseFilter(button.dataset.category)
         : undefined;
-    if (!category || category === currentCategory) return;
-    currentCategory = category;
-    persistCategory(category);
+    if (!category) return;
+    if (selectedCategories.has(category)) selectedCategories.delete(category);
+    else selectedCategories.add(category);
+    persistCategories();
     renderCategoryChips();
     renderMergedResults();
   });
@@ -159,7 +161,7 @@ function syncControls() {
   if (timeControl) timeControl.hidden = !online;
   const filterSlot = document.querySelector<HTMLElement>('#filter-slot');
   if (filterSlot) filterSlot.hidden = !inPerson && !online;
-  if (categoryChips) categoryChips.hidden = !courses;
+  if (categoryChips && !courses) categoryChips.hidden = true;
 }
 
 function renderIdleState() {
@@ -303,41 +305,49 @@ function listingCategory(item: OfficialCourseListing): CourseCategoryId {
 }
 
 function visibleListings(): OfficialCourseListing[] {
-  if (currentCategory === 'all') return mergedListings;
-  return mergedListings.filter((item) => listingCategory(item) === currentCategory);
+  if (!selectedCategories.size) return mergedListings;
+  return mergedListings.filter((item) => selectedCategories.has(listingCategory(item)));
 }
 
-function categoryCount(id: CourseFilterId): number {
-  if (id === 'all') return mergedListings.length;
-  return mergedListings.filter((item) => listingCategory(item) === id).length;
+function presentCategories(): CourseCategoryId[] {
+  return presentCourseCategories(
+    mergedListings.map((item) => ({ category: listingCategory(item) }))
+  );
+}
+
+function pruneSelectedCategories() {
+  const present = new Set(presentCategories());
+  if (!present.size) return;
+  for (const id of [...selectedCategories]) {
+    if (!present.has(id)) selectedCategories.delete(id);
+  }
+  if (!selectedCategories.size && present.has('beginner')) {
+    selectedCategories.add('beginner');
+  }
+  persistCategories();
 }
 
 function renderCategoryChips() {
   if (!categoryChips) return;
-  const searched = mergedListings.length > 0;
-  const chips = COURSE_FILTER_ORDER.map((id) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'category-chip';
-    button.dataset.category = id;
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-selected', String(id === currentCategory));
-    if (
-      searched &&
-      id !== currentCategory &&
-      id !== 'all' &&
-      categoryCount(id) === 0
-    ) {
-      button.classList.add('category-chip-empty');
-    }
-    button.textContent = courseCategoryLabel(id);
-    return button;
-  });
-  const scroll = document.createElement('div');
-  scroll.className = 'category-chips-scroll';
-  scroll.append(...chips.filter((chip) => chip.dataset.category !== 'all'));
-  const allChip = chips.find((chip) => chip.dataset.category === 'all');
-  categoryChips.replaceChildren(scroll, ...(allChip ? [allChip] : []));
+  const present = presentCategories();
+  if (currentSource !== 'aol' || !present.length) {
+    categoryChips.hidden = true;
+    categoryChips.replaceChildren();
+    return;
+  }
+  pruneSelectedCategories();
+  categoryChips.hidden = false;
+  categoryChips.replaceChildren(
+    ...present.map((id) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'category-chip';
+      button.dataset.category = id;
+      button.setAttribute('aria-pressed', String(selectedCategories.has(id)));
+      button.textContent = courseCategoryLabel(id);
+      return button;
+    })
+  );
 }
 
 function renderMergedResults(source?: SourceSearchResult) {
@@ -358,23 +368,20 @@ function renderMergedResults(source?: SourceSearchResult) {
   const listings = visibleListings();
   const nodes: HTMLElement[] = [];
   nodes.push(resultsMetaNode(listings.length));
+  const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
+  const grouped = selected.length !== 1;
 
   if (!listings.length) {
     nodes.push(
       emptyNode(
         currentMode === 'in_person'
-          ? 'No ' +
-              courseCategoryLabel(currentCategory).toLowerCase() +
-              ' programs within ' +
-              String(currentRadiusKm) +
-              ' km.'
-          : 'No ' +
-              courseCategoryLabel(currentCategory).toLowerCase() +
-              ' programs in this date range.'
+          ? 'No matching programs within ' + String(currentRadiusKm) + ' km.'
+          : 'No matching programs in this date range.'
       )
     );
-  } else if (currentCategory === 'all') {
-    for (const category of COURSE_CATEGORY_ORDER) {
+  } else if (grouped) {
+    const groups = selected.length ? selected : presentCategories();
+    for (const category of groups) {
       const group = listings.filter((item) => listingCategory(item) === category);
       if (!group.length) continue;
       const heading = document.createElement('h2');
@@ -397,7 +404,7 @@ function renderMergedResults(source?: SourceSearchResult) {
 function resultsMetaNode(count: number): HTMLElement {
   const meta = document.createElement('div');
   meta.className = 'results-meta';
-  const label = courseCategoryLabel(currentCategory);
+  const label = selectedCategoryLabel();
   if (currentMode === 'in_person') {
     const place = selectedLocation?.city || selectedLocation?.label || 'this location';
     meta.textContent =
@@ -414,6 +421,12 @@ function resultsMetaNode(count: number): HTMLElement {
       label + ' · ' + String(count) + (count === 1 ? ' program' : ' programs');
   }
   return meta;
+}
+
+function selectedCategoryLabel(): string {
+  const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
+  if (!selected.length) return 'Programs';
+  return selected.map((id) => courseCategoryLabel(id)).join(', ');
 }
 
 function nextShowMoreRadius(): number | undefined {
@@ -630,9 +643,8 @@ async function mountMapboxSearchBox() {
         fontFamily: 'inherit',
         unit: '13px',
         padding: '0.5em 0.75em',
-        border: '1px solid #e2e8f0',
-        borderRadius: '12px',
-        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.16)',
+        border: 'none',
+        boxShadow: 'none',
         colorBackground: '#ffffff',
         colorBackgroundHover: '#fff7ed',
         colorText: '#0f172a',
@@ -640,9 +652,11 @@ async function mountMapboxSearchBox() {
         minWidth: 'min(18rem, calc(100vw - 2rem))'
       },
       cssText: [
-        '.SearchBox{background:transparent;border:none;box-shadow:none;border-radius:0;min-width:0;width:100%;}',
+        ':host,:host:focus,:host:focus-visible{outline:none !important;box-shadow:none;}',
+        '.SearchBox,.SearchBox:focus,.SearchBox:focus-within,.SearchBox *{outline:none !important;box-shadow:none;}',
+        '.SearchBox,.SearchBox:focus,.SearchBox:focus-within{background:transparent;border:none !important;border-radius:0;min-width:0;width:100%;}',
         '.SearchIcon{display:none;}',
-        '.Input{background:transparent;color:#0f172a;padding:0.15em 0;}',
+        '.Input,.Input:focus,.Input:focus-visible{background:transparent;color:#0f172a;padding:0.15em 0;outline:none !important;box-shadow:none;border:none !important;}',
         '.Results,.ResultsList,.Suggestion{background:#ffffff;opacity:1;}',
         '.Results{color:#0f172a;}',
         '.SuggestionName,.SuggestionText,.Label{color:#0f172a;}',
@@ -660,6 +674,8 @@ async function mountMapboxSearchBox() {
       renderIdleState();
     });
     locationHost.replaceChildren(box);
+    box.style.setProperty('outline', 'none', 'important');
+    box.style.setProperty('box-shadow', 'none', 'important');
   } catch (error) {
     console.error('Mapbox Search Box failed to mount', error);
     if (fallback) fallback.placeholder = 'Location unavailable';
@@ -742,18 +758,19 @@ function persistTime(preset: TimePreset) {
   }
 }
 
-function readStoredCategory(): CourseFilterId {
+function readStoredCategories(): CourseCategoryId[] {
   try {
-    return parseCourseFilter(localStorage.getItem(CATEGORY_STORAGE_KEY) || '') || 'beginner';
+    const stored = parseCourseCategories(localStorage.getItem(CATEGORY_STORAGE_KEY) || '');
+    return stored.length ? stored : ['beginner'];
   } catch {
-    return 'beginner';
+    return ['beginner'];
   }
 }
 
-function persistCategory(category: CourseFilterId) {
+function persistCategories() {
   try {
-    localStorage.setItem(CATEGORY_STORAGE_KEY, category);
+    localStorage.setItem(CATEGORY_STORAGE_KEY, serializeCourseCategories(selectedCategories));
   } catch {
-    // Ignore storage failures; the selected category still applies for this visit.
+    // Ignore storage failures; the selected categories still apply for this visit.
   }
 }

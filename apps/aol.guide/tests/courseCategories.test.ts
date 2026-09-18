@@ -2,19 +2,33 @@ import { describe, expect, it } from 'vitest';
 import {
   COURSE_FILTER_ORDER,
   categorizeCourse,
-  nextAolRadiusKm
+  nextAolRadiusKm,
+  parseCourseCategories,
+  presentCourseCategories,
+  serializeCourseCategories
 } from '../lib/courseCategories.js';
 
 describe('course categories', () => {
-  it('puts Beginner first and All last', () => {
+  it('orders beginner first and has no All filter', () => {
     expect(COURSE_FILTER_ORDER[0]).toBe('beginner');
-    expect(COURSE_FILTER_ORDER.at(-1)).toBe('all');
+    expect(COURSE_FILTER_ORDER).not.toContain('all');
   });
 
   it('maps Happiness Program to Beginner', () => {
     expect(categorizeCourse({ courseTypeId: '74889', title: 'Happiness Program' })).toBe(
       'beginner'
     );
+  });
+
+  it('maps Sahaj Samadhi to Beginner', () => {
+    expect(
+      categorizeCourse({ courseTypeId: '339715', title: 'Sahaj Samadhi Dhyana Yoga' })
+    ).toBe('beginner');
+    expect(categorizeCourse({ title: 'Sahaj Samadhi Yoga' })).toBe('beginner');
+  });
+
+  it('maps Sri Sri Yoga to Yoga', () => {
+    expect(categorizeCourse({ courseTypeId: '337981', title: 'Sri Sri Yoga' })).toBe('yoga');
   });
 
   it('maps Medha and Utkarsha to Kids', () => {
@@ -45,5 +59,16 @@ describe('course categories', () => {
     expect(nextAolRadiusKm(10)).toBe(25);
     expect(nextAolRadiusKm(25)).toBe(50);
     expect(nextAolRadiusKm(50)).toBeUndefined();
+  });
+
+  it('serializes selected categories and omits missing ones', () => {
+    expect(serializeCourseCategories(['kids', 'beginner'])).toBe('beginner,kids');
+    expect(parseCourseCategories('beginner,all,kids,beginner')).toEqual([
+      'beginner',
+      'kids'
+    ]);
+    expect(presentCourseCategories([{ category: 'advanced' }, { category: 'beginner' }])).toEqual(
+      ['beginner', 'advanced']
+    );
   });
 });
