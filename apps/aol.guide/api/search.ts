@@ -12,7 +12,7 @@ import {
 
 const SearchBodySchema = z.object({
   query: z.string().trim().optional().default(''),
-  source: z.enum(['aol', 'vvmvp', 'vds']).optional(),
+  source: z.enum(['aol', 'center', 'vvmvp', 'vds']).optional(),
   mode: z.enum(['in_person', 'online']).optional(),
   datePreset: z
     .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days', 'custom'])
@@ -63,6 +63,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...result
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Invalid search request.' }
+      });
+    }
     const message = error instanceof Error ? error.message : 'Search failed.';
     const status = message.toLowerCase().includes('parse') ? 400 : 500;
     return res.status(status).json({
