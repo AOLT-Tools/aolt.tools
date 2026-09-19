@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FOLLOW_UP_COURSE_TYPE_IDS } from '../lib/courseAliases.js';
+import { parseSearchSource } from '../lib/searchRequest.js';
 import { OfficialSearchService } from '../lib/searchService.js';
 import {
   aolListingsFetchMock,
@@ -424,6 +425,96 @@ describe('official search service', () => {
     expect(result.sources[0]?.url).toContain('selectedLocName=Bengaluru');
     expect(result.sources[0]?.url).not.toContain('560077');
     expect(result.sources[0]?.listings?.[0]?.category).toBe('beginner');
+  });
+
+  it('parses the Center catalogue source', () => {
+    expect(parseSearchSource('center')).toBe('center');
+    expect(parseSearchSource('aol')).toBe('aol');
+  });
+
+  it('drops Follow-up and Satsang from the Courses catalogue', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock(
+        [
+          sampleAolCourse(),
+          sampleAolCourse({
+            title: 'Sudarshan Kriya Follow Up',
+            sao_id: 2001,
+            ctype: FOLLOW_UP_COURSE_TYPE_IDS[0]
+          }),
+          sampleAolCourse({
+            title: 'Weekly Satsang',
+            sao_id: 2002,
+            ctype: ''
+          })
+        ],
+        3,
+        requested
+      )
+    });
+    const result = await service.search({
+      source: 'aol',
+      mode: 'in_person',
+      radiusKm: 10,
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446,
+        city: 'Bengaluru'
+      }
+    });
+    expect(requested[0]).toContain('lat=12.9121');
+    expect(result.sources[0]?.listings?.map((listing) => listing.title)).toEqual([
+      'Happiness Program (3 Days)'
+    ]);
+  });
+
+  it('keeps only Follow-up and Satsang in the Center catalogue', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      pincodeResolver: testPincodeResolver(),
+      now,
+      fetchImpl: aolListingsFetchMock(
+        [
+          sampleAolCourse(),
+          sampleAolCourse({
+            title: 'Sudarshan Kriya Follow Up',
+            sao_id: 2001,
+            ctype: FOLLOW_UP_COURSE_TYPE_IDS[0]
+          }),
+          sampleAolCourse({
+            title: 'Weekly Satsang',
+            sao_id: 2002,
+            ctype: ''
+          })
+        ],
+        3,
+        requested
+      )
+    });
+    const result = await service.search({
+      source: 'center',
+      radiusKm: 3,
+      location: {
+        label: 'HSR Layout',
+        latitude: 12.9121,
+        longitude: 77.6446,
+        city: 'Bengaluru'
+      }
+    });
+    expect(result.sources[0]?.source).toBe('center');
+    expect(result.intent.deliveryMode).toBe('in_person');
+    expect(requested[0]).toContain('lat=12.9121');
+    expect(requested[0]).toContain('lng=77.6446');
+    expect(requested[0]).toContain('distance=3');
+    expect(requested[0]).toContain('is_online_event=0');
+    expect(result.sources[0]?.listings?.map((listing) => listing.title)).toEqual([
+      'Sudarshan Kriya Follow Up',
+      'Weekly Satsang'
+    ]);
   });
 
   it('loads live Bangalore Ashram listings for the Ashram catalogue', async () => {

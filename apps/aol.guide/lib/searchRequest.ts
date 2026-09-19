@@ -10,7 +10,12 @@ export function parseSearchMode(value: unknown): SearchMode | undefined {
 }
 
 export function parseSearchSource(value: unknown): SearchSourceId | undefined {
-  return value === 'aol' || value === 'vvmvp' || value === 'vds' ? value : undefined;
+  return value === 'aol' ||
+    value === 'center' ||
+    value === 'vvmvp' ||
+    value === 'vds'
+    ? value
+    : undefined;
 }
 
 export function parseRadiusKm(value: unknown): number | undefined {

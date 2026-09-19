@@ -97,6 +97,16 @@ export function nextAolRadiusKm(currentKm: number): number | undefined {
   return AOL_RADIUS_LADDER_KM.find((radius) => radius > currentKm);
 }
 
+export function isRegularConnectListing(input: {
+  title?: string;
+  courseCode?: string;
+  courseTypeId?: string;
+  category?: string;
+}): boolean {
+  if (input.category) return input.category === 'regular_connects';
+  return categorizeCourse(input) === 'regular_connects';
+}
+
 export function categorizeCourse(input: {
   title?: string;
   courseCode?: string;

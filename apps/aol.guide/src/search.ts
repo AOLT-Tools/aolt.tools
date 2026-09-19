@@ -22,7 +22,7 @@ import {
   type BrowserLocation
 } from './mapboxSearchJs.js';
 
-type SearchSource = 'aol' | 'vvmvp' | 'vds';
+type SearchSource = 'aol' | 'center' | 'vvmvp' | 'vds';
 type SearchMode = 'in_person' | 'online';
 type TimePreset = OnlineTimePreset;
 
@@ -119,6 +119,7 @@ let officialUrl = '';
 let searchRequestId = 0;
 let searchAbort: AbortController | null = null;
 let timeCustomOpen = false;
+let onlineRangeSelected = false;
 
 initializeSearchPage();
 
@@ -157,13 +158,20 @@ function initializeSearchPage() {
     currentMode = mode;
     persistMode(mode);
     resetListings();
+    if (currentMode === 'online') onlineRangeSelected = false;
     renderModeToggle();
     syncControls();
+    if (usesOnlineSearch() && !onlineRangeSelected) {
+      showOnlineIdle();
+      return;
+    }
     void runCatalogSearch();
   });
 
   timeShortcut?.addEventListener('change', () => {
-    applyTimeShortcut(parseTimePreset(timeShortcut.value) || 'anytime');
+    const preset = parseTimePreset(timeShortcut.value);
+    if (!preset) return;
+    applyTimeShortcut(preset);
   });
 
   timeRangeControl?.addEventListener('click', () => {
@@ -203,8 +211,8 @@ function initializeSearchPage() {
 
 function syncControls() {
   const courses = currentSource === 'aol';
-  const inPerson = courses && currentMode === 'in_person';
-  const online = courses && currentMode === 'online';
+  const inPerson = usesLocationSearch();
+  const online = usesOnlineSearch();
   if (modeToggle) modeToggle.hidden = !courses;
   if (locationControl) locationControl.hidden = !inPerson;
   if (timeControl) timeControl.hidden = !online;
@@ -212,30 +220,66 @@ function syncControls() {
   const filterSlot = document.querySelector<HTMLElement>('#filter-slot');
   if (filterSlot) filterSlot.hidden = !inPerson;
   renderTimeControls();
-  if (categoryChips && currentSource === 'vds') {
+  if (categoryChips && currentSource !== 'aol' && currentSource !== 'vvmvp') {
     categoryChips.hidden = true;
     categoryChips.replaceChildren();
   }
 }
 
+function usesLocationSearch(): boolean {
+  return currentSource === 'center' || (currentSource === 'aol' && currentMode === 'in_person');
+}
+
+function usesOnlineSearch(): boolean {
+  return currentSource === 'aol' && currentMode === 'online';
+}
+
 function renderIdleState() {
   if (!results) return;
-  if (currentSource !== 'aol') {
+  if (currentSource === 'vvmvp' || currentSource === 'vds') {
     results.replaceChildren(emptyNode('Loading official programs…'));
     void runCatalogSearch();
     return;
   }
-  if (currentMode === 'in_person' && !selectedLocation) {
-    results.replaceChildren(emptyNode('Pick a location to see programs nearby.'));
+  if (usesLocationSearch() && !selectedLocation) {
+    showLocationIdle();
+    return;
+  }
+  if (usesOnlineSearch() && !onlineRangeSelected) {
+    showOnlineIdle();
     return;
   }
   void runCatalogSearch();
 }
 
+function showLocationIdle() {
+  if (summaryStrip) summaryStrip.hidden = true;
+  setStatus('');
+  if (categoryChips) {
+    categoryChips.hidden = true;
+    categoryChips.replaceChildren();
+  }
+  results?.replaceChildren(emptyNode('Pick a location to see programs nearby.'));
+}
+
+function showOnlineIdle() {
+  if (summaryStrip) summaryStrip.hidden = true;
+  setStatus('');
+  if (categoryChips) {
+    categoryChips.hidden = true;
+    categoryChips.replaceChildren();
+  }
+  results?.replaceChildren(emptyNode('Pick a date range to see programs.'));
+}
+
 async function runCatalogSearch(options: { append?: boolean } = {}) {
   if (!results) return;
-  if (currentSource === 'aol' && currentMode === 'in_person' && !selectedLocation) {
-    results.replaceChildren(emptyNode('Pick a location to see programs nearby.'));
+  if (usesLocationSearch() && !selectedLocation) {
+    showLocationIdle();
+    return;
+  }
+  if (usesOnlineSearch() && !onlineRangeSelected) {
+    showOnlineIdle();
     return;
   }
   if (
@@ -252,12 +296,11 @@ async function runCatalogSearch(options: { append?: boolean } = {}) {
   const controller = new AbortController();
   searchAbort = controller;
   const requestId = ++searchRequestId;
-  const radiusKm =
-    currentSource === 'aol' && currentMode === 'in_person'
-      ? options.append
-        ? currentRadiusKm
-        : FIRST_RADIUS_KM
-      : undefined;
+  const radiusKm = usesLocationSearch()
+    ? options.append
+      ? currentRadiusKm
+      : FIRST_RADIUS_KM
+    : undefined;
   if (radiusKm && !options.append) currentRadiusKm = radiusKm;
 
   setStatus('Searching…', 'loading');
@@ -326,10 +369,7 @@ async function fetchCatalog(
           ? customDateTo || undefined
           : undefined,
       radiusKm,
-      location:
-        currentSource === 'aol' && currentMode === 'in_person'
-          ? searchLocationCoords(selectedLocation)
-          : undefined
+      location: usesLocationSearch() ? searchLocationCoords(selectedLocation) : undefined
     })
   });
   const contentType = response.headers.get('content-type') || '';
@@ -391,6 +431,7 @@ function visibleListings(): OfficialCourseListing[] {
       (item) => ashramCategory(item) === selectedAshramCategory
     );
   }
+  if (currentSource === 'center') return mergedListings;
   if (!selectedCategories.size) return mergedListings;
   return mergedListings.filter((item) => selectedCategories.has(listingCategory(item)));
 }
@@ -528,12 +569,14 @@ function renderMergedResults(source?: SourceSearchResult) {
   if (!listings.length) {
     nodes.push(
       emptyNode(
-        currentMode === 'in_person'
+        usesLocationSearch()
           ? 'No matching programs within ' + String(currentRadiusKm) + ' km.'
           : 'No matching programs in this date range.'
       )
     );
-  } else if (grouped) {
+  } else if (currentSource === 'center' || !grouped) {
+    for (const listing of listings) nodes.push(renderListingCard(listing));
+  } else {
     const groups = selected.length ? selected : presentCategories();
     for (const category of groups) {
       const group = listings.filter((item) => listingCategory(item) === category);
@@ -544,8 +587,6 @@ function renderMergedResults(source?: SourceSearchResult) {
       nodes.push(heading);
       for (const listing of group) nodes.push(renderListingCard(listing));
     }
-  } else {
-    for (const listing of listings) nodes.push(renderListingCard(listing));
   }
 
   const nextRadius = nextShowMoreRadius();
@@ -564,7 +605,7 @@ function resultsMetaNode(count: number): HTMLElement {
       label + ' · ' + String(count) + (count === 1 ? ' program' : ' programs');
     return meta;
   }
-  if (currentMode === 'in_person') {
+  if (usesLocationSearch()) {
     const place = selectedLocation?.city || selectedLocation?.label || 'this location';
     meta.textContent =
       label +
@@ -588,13 +629,14 @@ function selectedCategoryLabel(): string {
       ? vvmvpCategoryLabel(selectedAshramCategory)
       : 'Programs';
   }
+  if (currentSource === 'center') return 'Follow-up & Satsang';
   const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
   if (!selected.length) return 'Programs';
   return selected.map((id) => courseCategoryLabel(id)).join(', ');
 }
 
 function nextShowMoreRadius(): number | undefined {
-  if (currentSource !== 'aol' || currentMode !== 'in_person') return undefined;
+  if (!usesLocationSearch()) return undefined;
   return nextAolRadiusKm(currentRadiusKm);
 }
 
@@ -662,12 +704,15 @@ function moreResultsLink(url: string): HTMLAnchorElement {
 function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const card = document.createElement('article');
   card.className = 'result-card';
-  const online = currentMode === 'online' || item.isOnline;
+  const online = currentSource !== 'center' && (currentMode === 'online' || item.isOnline);
 
   const header = document.createElement('header');
+  header.className = 'result-card-header';
+  const heading = document.createElement('div');
+  heading.className = 'result-card-heading';
   const title = document.createElement('h2');
   title.textContent = item.title;
-  header.append(title);
+  heading.append(title);
   if (online) {
     const labels = document.createElement('div');
     labels.className = 'result-card-labels';
@@ -675,7 +720,17 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
     badge.className = 'badge online-badge';
     badge.textContent = 'Online';
     labels.append(badge);
-    header.append(labels);
+    heading.prepend(labels);
+  }
+  header.append(heading);
+
+  const url = item.registerUrl || item.detailUrl;
+  if (url) {
+    const register = document.createElement('span');
+    register.className = 'register-affordance';
+    register.textContent = 'Register →';
+    header.append(register);
+    makeCardClickable(card, url);
   }
 
   const meta = document.createElement('div');
@@ -700,9 +755,6 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
 
   card.append(header, meta);
   if (secondary.childElementCount) card.append(secondary);
-
-  const url = item.registerUrl || item.detailUrl;
-  if (url) makeCardClickable(card, url);
   return card;
 }
 
@@ -790,11 +842,12 @@ function renderTimeControls() {
   }
   const anytime = currentTimePreset === 'anytime';
   const showCustom = Boolean(timeCustomOpen && timeControl && !timeControl.hidden);
-  if (timeShortcut) timeShortcut.value = currentTimePreset;
+  if (timeShortcut) timeShortcut.value = onlineRangeSelected ? currentTimePreset : '';
   if (timeRangeLabel) {
-    timeRangeLabel.textContent = anytime
-      ? 'Anytime'
-      : formatCompactDateRange(customDateFrom, customDateTo);
+    timeRangeLabel.textContent =
+      !onlineRangeSelected || anytime
+        ? 'Anytime'
+        : formatCompactDateRange(customDateFrom, customDateTo);
   }
   if (timeRangeControl) {
     timeRangeControl.setAttribute('aria-expanded', String(showCustom));
@@ -817,6 +870,7 @@ function renderTimeControls() {
 function applyTimeShortcut(preset: TimePreset) {
   currentTimePreset = preset;
   persistTime(preset);
+  onlineRangeSelected = true;
   timeCustomOpen = preset === 'custom';
   if (preset === 'anytime') {
     customDateFrom = '';
@@ -899,6 +953,7 @@ function onDateInputsChanged() {
     customDateTo = customDateFrom;
   }
   persistCustomDates();
+  onlineRangeSelected = true;
   currentTimePreset = presetMatchingDates(customDateFrom, customDateTo);
   persistTime(currentTimePreset);
   renderTimeControls();
@@ -992,8 +1047,10 @@ async function mountMapboxSearchBox() {
     });
     box.addEventListener('clear', () => {
       selectedLocation = undefined;
+      searchAbort?.abort();
+      searchRequestId += 1;
       resetListings();
-      renderIdleState();
+      showLocationIdle();
     });
     locationHost.replaceChildren(box);
     box.style.setProperty('outline', 'none', 'important');
@@ -1015,7 +1072,7 @@ function searchLocationCoords(location: BrowserLocation | undefined) {
 }
 
 function parseSource(value: string | undefined): SearchSource | undefined {
-  return value === 'aol' || value === 'vvmvp' || value === 'vds' ? value : undefined;
+  return value === 'aol' || value === 'center' ? value : undefined;
 }
 
 function parseMode(value: string | undefined): SearchMode | undefined {

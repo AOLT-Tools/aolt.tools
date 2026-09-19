@@ -3,6 +3,7 @@ import {
   COURSE_FILTER_ORDER,
   categorizeCourse,
   courseCategoryLabel,
+  isRegularConnectListing,
   nextAolRadiusKm,
   parseCourseCategories,
   presentCourseCategories,
@@ -66,6 +67,16 @@ describe('course categories', () => {
       })
     ).toBe('regular_connects');
     expect(categorizeCourse({ title: 'Weekly Satsang' })).toBe('regular_connects');
+    expect(
+      isRegularConnectListing({
+        courseTypeId: '351956',
+        title: 'Sudarshan Kriya Follow Up'
+      })
+    ).toBe(true);
+    expect(isRegularConnectListing({ title: 'Weekly Satsang' })).toBe(true);
+    expect(isRegularConnectListing({ category: 'beginner', title: 'Weekly Satsang' })).toBe(
+      false
+    );
     expect(parseCourseCategories('follow_up,beginner')).toEqual([
       'beginner',
       'regular_connects'

@@ -42,10 +42,8 @@
           <span class="sync-pill" id="status-pill" hidden></span>
           <a
             class="feedback-link"
-            href="https://wa.me/919845702929?text=Hi%2C%20I%20have%20feedback%20for%20AOL%20Guide%3A"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Send feedback on WhatsApp"
+            href="mailto:jsaurabh@gmail.com?subject=AOL%20Guide%20feedback"
+            aria-label="Send feedback by email"
           >
             💡 Feedback
           </a>
@@ -76,18 +74,9 @@
               class="source-option"
               role="radio"
               aria-checked="false"
-              data-source="vvmvp"
+              data-source="center"
             >
-              Ashram
-            </button>
-            <button
-              type="button"
-              class="source-option"
-              role="radio"
-              aria-checked="false"
-              data-source="vds"
-            >
-              Puja
+              Center
             </button>
           </div>
 
@@ -118,24 +107,25 @@
           </div>
         </div>
 
-        <div class="filter-slot mt-1.5" id="filter-slot">
-          <div class="filter-control" id="location-control">
-            <span class="filter-icon" aria-hidden="true">📍</span>
-            <div class="filter-control-body" id="location-host">
-              <input
-                id="location-fallback"
-                class="filter-input"
-                type="text"
-                autocomplete="off"
-                placeholder="Pick a location"
-                disabled
-              />
+        <div class="search-controls" id="search-controls">
+
+          <div class="filter-slot" id="filter-slot">
+            <div class="filter-control" id="location-control">
+              <span class="filter-icon" aria-hidden="true">📍</span>
+              <div class="filter-control-body" id="location-host">
+                <input
+                  id="location-fallback"
+                  class="filter-input"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Pick a location"
+                  disabled
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="time-panel mt-1.5" id="time-control" hidden>
-          <div class="time-control">
+          <div class="time-control" id="time-control" hidden>
             <button
               type="button"
               class="filter-control time-range-control"
@@ -148,6 +138,7 @@
             </button>
             <label class="sr-only" for="time-shortcut">Date shortcuts</label>
             <select id="time-shortcut" class="time-shortcut">
+              <option value="" disabled>Range</option>
               <option value="anytime">Anytime</option>
               <option value="today">Today</option>
               <option value="tomorrow">Tomorrow</option>
@@ -156,17 +147,18 @@
               <option value="custom">Custom</option>
             </select>
           </div>
-          <div class="time-custom-panel" id="time-custom-panel" hidden>
-            <label class="time-custom-field" for="date-from">
-              <span>From</span>
-              <input id="date-from" class="date-input" type="date" />
-            </label>
-            <span class="date-sep" aria-hidden="true">–</span>
-            <label class="time-custom-field" for="date-to">
-              <span>To</span>
-              <input id="date-to" class="date-input" type="date" />
-            </label>
-          </div>
+        </div>
+
+        <div class="time-custom-panel" id="time-custom-panel" hidden>
+          <label class="time-custom-field" for="date-from">
+            <span>From</span>
+            <input id="date-from" class="date-input" type="date" />
+          </label>
+          <span class="date-sep" aria-hidden="true">–</span>
+          <label class="time-custom-field" for="date-to">
+            <span>To</span>
+            <input id="date-to" class="date-input" type="date" />
+          </label>
         </div>
 
         <div

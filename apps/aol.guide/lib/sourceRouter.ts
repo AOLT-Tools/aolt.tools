@@ -10,6 +10,7 @@ export const SEARCH_SOURCE_ADAPTERS = [
 ] as const;
 
 export function routeSources(intent: ResolvedSearchIntent): SearchSourceId[] {
+  if (intent.source === 'center') return ['aol'];
   if (intent.source === 'aol' || intent.source === 'vvmvp' || intent.source === 'vds') {
     return [intent.source];
   }

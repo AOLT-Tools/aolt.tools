@@ -1,4 +1,4 @@
-export type SearchSourceId = 'aol' | 'vvmvp' | 'vds';
+export type SearchSourceId = 'aol' | 'center' | 'vvmvp' | 'vds';
 
 export type SearchIntentSource = SearchSourceId | 'all';
 

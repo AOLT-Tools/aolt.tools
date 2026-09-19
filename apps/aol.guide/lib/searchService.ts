@@ -3,6 +3,7 @@ import {
   FOLLOW_UP_COURSE_TYPE_IDS,
   findCourseAliasByCode
 } from './courseAliases.js';
+import { isRegularConnectListing } from './courseCategories.js';
 import {
   resolveCustomDateRange,
   resolveOnlineTimePreset,
@@ -14,6 +15,7 @@ import {
 } from './queryParser.js';
 import type { PincodeCoordinateResolver } from './pincodeCoordinates.js';
 import type {
+  OfficialCourseListing,
   ResolvedSearchIntent,
   SearchSourceId,
   SourceSearchResult
@@ -145,7 +147,8 @@ export class OfficialSearchService {
     const now = this.options.now || new Date();
     const sourceId = request.source || 'aol';
     const intent = catalogIntent(request, now);
-    const adapter = SEARCH_SOURCE_ADAPTERS.find((item) => item.id === sourceId);
+    const adapterId = sourceId === 'center' ? 'aol' : sourceId;
+    const adapter = SEARCH_SOURCE_ADAPTERS.find((item) => item.id === adapterId);
     const messages = [...intent.messages];
     if (!adapter) {
       return {
@@ -159,8 +162,10 @@ export class OfficialSearchService {
     }
 
     const source = adapter.buildResult(intent, now);
-    if (sourceId === 'aol') {
+    if (sourceId === 'aol' || sourceId === 'center') {
       await this.attachCatalogListings(source, intent, now, messages);
+      source.listings = filterAolCatalogListings(sourceId, source.listings || []);
+      if (sourceId === 'center') source.source = 'center';
     } else if (sourceId === 'vvmvp') {
       await this.attachVvmvpCatalogListings(source, messages);
     }
@@ -443,7 +448,7 @@ function catalogIntent(
       courseTypeIds: [],
       ashramMentioned: source === 'vvmvp',
       vdsMentioned: source === 'vds',
-      courseMentioned: source === 'aol',
+      courseMentioned: source === 'aol' || source === 'center',
       pincodeResolved: false,
       messages: []
     },
@@ -509,4 +514,15 @@ export function applySearchControls(
     };
   }
   return next;
+}
+
+export function filterAolCatalogListings(
+  sourceId: SearchSourceId,
+  listings: OfficialCourseListing[]
+): OfficialCourseListing[] {
+  if (sourceId !== 'aol' && sourceId !== 'center') return listings;
+  const keepConnects = sourceId === 'center';
+  return listings.filter(
+    (item) => isRegularConnectListing(item) === keepConnects
+  );
 }

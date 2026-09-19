@@ -6,7 +6,7 @@
   }
 
   .feedback-link {
-    @apply inline-flex min-h-8 shrink-0 items-center rounded-full bg-[#25D366]/15 px-3 text-[13px] font-semibold text-[#128C7E] no-underline;
+    @apply inline-flex min-h-8 shrink-0 items-center rounded-full bg-[#1b3a6e]/10 px-3 text-[13px] font-semibold text-[#1b3a6e] no-underline;
   }
 
   .filter-bar {
@@ -14,7 +14,7 @@
   }
 
   .source-toggle {
-    @apply grid min-w-0 flex-1 grid-cols-3 rounded-full bg-[#d7e3f4] p-0.5;
+    @apply grid min-w-0 flex-1 grid-cols-2 rounded-full bg-[#d7e3f4] p-0.5;
   }
 
   .source-option,
@@ -38,8 +38,16 @@
     @apply bg-white text-[#c2410c] shadow-sm;
   }
 
+  .search-controls {
+    @apply mt-1.5 flex items-center gap-1.5;
+  }
+
+  .search-controls[hidden] {
+    display: none !important;
+  }
+
   .mode-toggle {
-    @apply grid w-[9.25rem] shrink-0 grid-cols-2 rounded-full bg-[#fde4d4] p-0.5;
+    @apply grid h-8 w-[9.25rem] shrink-0 grid-cols-2 rounded-full bg-[#fde4d4] p-0.5;
   }
 
   .mode-toggle[hidden] {
@@ -83,12 +91,12 @@
     @apply cursor-pointer appearance-none bg-transparent;
   }
 
-  .time-panel[hidden] {
-    display: none !important;
+  .time-control {
+    @apply flex min-w-0 flex-1 items-center gap-1.5;
   }
 
-  .time-control {
-    @apply flex items-center gap-1.5;
+  .time-control[hidden] {
+    display: none !important;
   }
 
   .time-range-control {
@@ -219,8 +227,20 @@
     @apply m-0 text-[16px] leading-snug font-bold tracking-[-0.01em] text-slate-900;
   }
 
+  .result-card-header {
+    @apply flex items-start justify-between gap-2;
+  }
+
+  .result-card-heading {
+    @apply min-w-0 flex-1;
+  }
+
   .result-card-labels {
-    @apply order-first flex flex-wrap items-center gap-1.5;
+    @apply mb-1 flex flex-wrap items-center gap-1.5;
+  }
+
+  .register-affordance {
+    @apply shrink-0 pt-0.5 text-[13px] font-bold text-[#ee6b1f];
   }
 
   .badge {
