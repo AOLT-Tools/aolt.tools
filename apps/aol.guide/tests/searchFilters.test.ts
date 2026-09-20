@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { locationFromMapboxRetrieve } from '../src/mapboxSearchJs.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  LOCATION_SUGGEST_DEBOUNCE_MS,
+  LOCATION_SUGGEST_MIN_CHARS,
+  locationFromMapboxRetrieve,
+  shouldSuggestLocationQuery,
+  suggestMapboxTemporaryLocations
+} from '../src/mapboxSearchJs.js';
 import {
   parseIsoDate,
   resolveCustomDateRange,
@@ -55,6 +61,58 @@ describe('browser Mapbox retrieve parsing', () => {
       longitude: 77.621558,
       city: 'Bengaluru'
     });
+  });
+});
+
+describe('temporary location suggest', () => {
+  it('waits 300ms and ignores queries shorter than 3 characters', async () => {
+    const fetchImpl = vi.fn() as typeof fetch;
+    expect(LOCATION_SUGGEST_DEBOUNCE_MS).toBe(300);
+    expect(LOCATION_SUGGEST_MIN_CHARS).toBe(3);
+    expect(shouldSuggestLocationQuery('MS')).toBe(false);
+    expect(shouldSuggestLocationQuery('MSR')).toBe(true);
+    expect(
+      await suggestMapboxTemporaryLocations('MS', 'pk.test-token', { fetchImpl })
+    ).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('requests temporary geocoding after a long enough query', async () => {
+    const requested: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      requested.push(String(input));
+      return new Response(
+        JSON.stringify({
+          features: [
+            {
+              geometry: { type: 'Point', coordinates: [77.621558, 13.041018] },
+              properties: {
+                name: 'MSR North City',
+                coordinates: { latitude: 13.041018, longitude: 77.621558 },
+                context: { place: { name: 'Bengaluru' } }
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }) as typeof fetch;
+    const suggestions = await suggestMapboxTemporaryLocations(
+      'MSR North City',
+      'pk.test-token',
+      { fetchImpl }
+    );
+    expect(suggestions).toEqual([
+      {
+        label: 'MSR North City',
+        latitude: 13.041018,
+        longitude: 77.621558,
+        city: 'Bengaluru'
+      }
+    ]);
+    expect(requested[0]).toContain('permanent=false');
+    expect(requested[0]).toContain('autocomplete=true');
+    expect(requested[0]).not.toContain('permanent=true');
   });
 });
 

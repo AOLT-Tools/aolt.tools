@@ -5,6 +5,7 @@ import {
   parseCourseCategories,
   parseCourseFilter,
   presentCourseCategories,
+  resolveCourseCategory,
   serializeCourseCategories,
   type CourseCategoryId
 } from '../lib/courseCategories.js';
@@ -17,8 +18,9 @@ import {
   type OnlineTimePreset
 } from '../lib/dateRanges.js';
 import {
-  loadMapboxSearchJs,
-  locationFromMapboxRetrieve,
+  LOCATION_SUGGEST_DEBOUNCE_MS,
+  shouldSuggestLocationQuery,
+  suggestMapboxTemporaryLocations,
   type BrowserLocation
 } from './mapboxSearchJs.js';
 
@@ -132,7 +134,7 @@ function initializeSearchPage() {
   syncControls();
   renderCategoryChips();
   renderTimeControls();
-  void mountMapboxSearchBox();
+  void mountLocationSearch();
   renderIdleState();
 
   sourceToggle?.addEventListener('click', (event) => {
@@ -200,9 +202,8 @@ function initializeSearchPage() {
       return;
     }
     const category = parseCourseFilter(raw);
-    if (!category) return;
-    if (selectedCategories.has(category)) selectedCategories.delete(category);
-    else selectedCategories.add(category);
+    if (!category || selectedCategories.has(category)) return;
+    selectedCategories = new Set([category]);
     persistCategories();
     renderCategoryChips();
     renderMergedResults();
@@ -432,7 +433,7 @@ function visibleListings(): OfficialCourseListing[] {
     );
   }
   if (currentSource === 'center') return mergedListings;
-  if (!selectedCategories.size) return mergedListings;
+  if (!selectedCategories.size) return [];
   return mergedListings.filter((item) => selectedCategories.has(listingCategory(item)));
 }
 
@@ -457,14 +458,8 @@ function presentAshramCategories(order?: string[]): string[] {
 }
 
 function pruneSelectedCategories() {
-  const present = new Set(presentCategories());
-  if (!present.size) return;
-  for (const id of [...selectedCategories]) {
-    if (!present.has(id)) selectedCategories.delete(id);
-  }
-  if (!selectedCategories.size && present.has('beginner')) {
-    selectedCategories.add('beginner');
-  }
+  const next = resolveCourseCategory(presentCategories(), selectedCategories);
+  selectedCategories = new Set(next ? [next] : []);
   persistCategories();
 }
 
@@ -497,8 +492,9 @@ function renderCategoryChips() {
         button.type = 'button';
         button.className = 'category-chip';
         button.dataset.category = name;
+        button.setAttribute('role', 'radio');
         button.setAttribute(
-          'aria-pressed',
+          'aria-checked',
           String(name === selectedAshramCategory)
         );
         button.textContent = vvmvpCategoryLabel(name);
@@ -521,7 +517,8 @@ function renderCategoryChips() {
       button.type = 'button';
       button.className = 'category-chip';
       button.dataset.category = id;
-      button.setAttribute('aria-pressed', String(selectedCategories.has(id)));
+      button.setAttribute('role', 'radio');
+      button.setAttribute('aria-checked', String(selectedCategories.has(id)));
       button.textContent = courseCategoryLabel(id);
       return button;
     })
@@ -563,9 +560,6 @@ function renderMergedResults(source?: SourceSearchResult) {
     return;
   }
 
-  const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
-  const grouped = selected.length !== 1;
-
   if (!listings.length) {
     nodes.push(
       emptyNode(
@@ -574,19 +568,8 @@ function renderMergedResults(source?: SourceSearchResult) {
           : 'No matching programs in this date range.'
       )
     );
-  } else if (currentSource === 'center' || !grouped) {
-    for (const listing of listings) nodes.push(renderListingCard(listing));
   } else {
-    const groups = selected.length ? selected : presentCategories();
-    for (const category of groups) {
-      const group = listings.filter((item) => listingCategory(item) === category);
-      if (!group.length) continue;
-      const heading = document.createElement('h2');
-      heading.className = 'category-heading';
-      heading.textContent = courseCategoryLabel(category);
-      nodes.push(heading);
-      for (const listing of group) nodes.push(renderListingCard(listing));
-    }
+    for (const listing of listings) nodes.push(renderListingCard(listing));
   }
 
   const nextRadius = nextShowMoreRadius();
@@ -630,9 +613,8 @@ function selectedCategoryLabel(): string {
       : 'Programs';
   }
   if (currentSource === 'center') return 'Follow-up & Satsang';
-  const selected = COURSE_CATEGORY_ORDER.filter((id) => selectedCategories.has(id));
-  if (!selected.length) return 'Programs';
-  return selected.map((id) => courseCategoryLabel(id)).join(', ');
+  const selected = COURSE_CATEGORY_ORDER.find((id) => selectedCategories.has(id));
+  return selected ? courseCategoryLabel(selected) : 'Programs';
 }
 
 function nextShowMoreRadius(): number | undefined {
@@ -728,7 +710,8 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   if (url) {
     const register = document.createElement('span');
     register.className = 'register-affordance';
-    register.textContent = 'Register →';
+    register.textContent =
+      currentSource === 'center' ? 'More Info →' : 'Register →';
     header.append(register);
     makeCardClickable(card, url);
   }
@@ -1001,64 +984,174 @@ function setStatus(label: string, state: 'idle' | 'loading' | 'error' = 'idle') 
   statusPill.dataset.state = state;
 }
 
-async function mountMapboxSearchBox() {
+async function mountLocationSearch() {
   if (!locationHost) return;
   const token = (import.meta.env.AOL_GUIDE_MAPBOX_TOKEN || '').trim();
-  const fallback = locationHost.querySelector<HTMLInputElement>('#location-fallback');
+  const input = locationHost.querySelector<HTMLInputElement>('#location-input');
+  const clearButton =
+    locationHost.querySelector<HTMLButtonElement>('#location-clear');
+  const suggestionList = locationHost.querySelector<HTMLElement>(
+    '#location-suggestions'
+  );
+  if (!input || !suggestionList) return;
   if (!token.startsWith('pk.')) {
-    if (fallback) fallback.placeholder = 'Mapbox token missing';
+    input.placeholder = 'Mapbox token missing';
     return;
   }
-  try {
-    const searchJs = await loadMapboxSearchJs();
-    const box = new searchJs.MapboxSearchBox();
-    box.accessToken = token;
-    box.placeholder = 'Pick a location';
-    box.options = { language: 'en', country: 'IN' };
-    box.theme = {
-      variables: {
-        fontFamily: 'inherit',
-        unit: '13px',
-        padding: '0.5em 0.75em',
-        border: 'none',
-        boxShadow: 'none',
-        colorBackground: '#ffffff',
-        colorBackgroundHover: '#fff7ed',
-        colorText: '#0f172a',
-        colorSecondary: '#475569',
-        minWidth: 'min(18rem, calc(100vw - 2rem))'
-      },
-      cssText: [
-        ':host,:host:focus,:host:focus-visible{outline:none !important;box-shadow:none;}',
-        '.SearchBox,.SearchBox:focus,.SearchBox:focus-within,.SearchBox *{outline:none !important;box-shadow:none;}',
-        '.SearchBox,.SearchBox:focus,.SearchBox:focus-within{background:transparent;border:none !important;border-radius:0;min-width:0;width:100%;}',
-        '.SearchIcon{display:none;}',
-        '.Input,.Input:focus,.Input:focus-visible{background:transparent;color:#0f172a;padding:0.15em 0;outline:none !important;box-shadow:none;border:none !important;}',
-        '.Results,.ResultsList,.Suggestion{background:#ffffff;opacity:1;}',
-        '.Results{color:#0f172a;}',
-        '.SuggestionName,.SuggestionText,.Label{color:#0f172a;}',
-        '.SuggestionDesc{color:#475569;}'
-      ].join('')
-    };
-    box.addEventListener('retrieve', (event: Event) => {
-      selectedLocation = locationFromMapboxRetrieve((event as CustomEvent).detail);
-      resetListings();
-      void runCatalogSearch();
+
+  input.disabled = false;
+  let debounceTimer = 0;
+  let suggestAbort: AbortController | null = null;
+  let highlightIndex = -1;
+
+  const hideSuggestions = () => {
+    suggestionList.hidden = true;
+    suggestionList.replaceChildren();
+    highlightIndex = -1;
+  };
+
+  const syncClearButton = () => {
+    if (!clearButton) return;
+    clearButton.hidden = !input.value.trim();
+  };
+
+  const clearLocation = () => {
+    suggestAbort?.abort();
+    window.clearTimeout(debounceTimer);
+    selectedLocation = undefined;
+    input.value = '';
+    syncClearButton();
+    hideSuggestions();
+    searchAbort?.abort();
+    searchRequestId += 1;
+    resetListings();
+    showLocationIdle();
+  };
+
+  const chooseSuggestion = (location: BrowserLocation) => {
+    suggestAbort?.abort();
+    window.clearTimeout(debounceTimer);
+    selectedLocation = location;
+    input.value = location.label;
+    syncClearButton();
+    hideSuggestions();
+    resetListings();
+    void runCatalogSearch();
+  };
+
+  const renderSuggestions = (locations: BrowserLocation[]) => {
+    suggestionList.replaceChildren();
+    if (!locations.length) {
+      hideSuggestions();
+      return;
+    }
+    locations.forEach((location, index) => {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'suggestion-option';
+      option.setAttribute('role', 'option');
+      option.dataset.index = String(index);
+      option.textContent = location.label;
+      option.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        chooseSuggestion(location);
+      });
+      suggestionList.append(option);
     });
-    box.addEventListener('clear', () => {
+    suggestionList.hidden = false;
+    highlightIndex = -1;
+  };
+
+  const requestSuggestions = async (query: string) => {
+    suggestAbort?.abort();
+    if (!shouldSuggestLocationQuery(query)) {
+      hideSuggestions();
+      return;
+    }
+    const controller = new AbortController();
+    suggestAbort = controller;
+    try {
+      const locations = await suggestMapboxTemporaryLocations(query, token, {
+        signal: controller.signal
+      });
+      if (controller.signal.aborted || input.value.trim() !== query.trim()) {
+        return;
+      }
+      renderSuggestions(locations);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.error('Mapbox temporary geocode failed', error);
+      hideSuggestions();
+    }
+  };
+
+  input.addEventListener('input', () => {
+    const query = input.value;
+    syncClearButton();
+    if (!query.trim()) {
+      clearLocation();
+      return;
+    }
+    if (selectedLocation && query.trim() !== selectedLocation.label) {
       selectedLocation = undefined;
-      searchAbort?.abort();
-      searchRequestId += 1;
-      resetListings();
-      showLocationIdle();
+    }
+    window.clearTimeout(debounceTimer);
+    if (!shouldSuggestLocationQuery(query)) {
+      hideSuggestions();
+      return;
+    }
+    debounceTimer = window.setTimeout(() => {
+      void requestSuggestions(query);
+    }, LOCATION_SUGGEST_DEBOUNCE_MS);
+  });
+
+  input.addEventListener('keydown', (event) => {
+    const options = [
+      ...suggestionList.querySelectorAll<HTMLButtonElement>('.suggestion-option')
+    ];
+    if (event.key === 'Escape') {
+      hideSuggestions();
+      return;
+    }
+    if (!options.length || suggestionList.hidden) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      highlightIndex = (highlightIndex + 1) % options.length;
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      highlightIndex = (highlightIndex - 1 + options.length) % options.length;
+    } else if (event.key === 'Enter' && highlightIndex >= 0) {
+      event.preventDefault();
+      options[highlightIndex]?.dispatchEvent(new Event('mousedown'));
+      return;
+    } else {
+      return;
+    }
+    options.forEach((option, index) => {
+      option.setAttribute(
+        'aria-selected',
+        index === highlightIndex ? 'true' : 'false'
+      );
     });
-    locationHost.replaceChildren(box);
-    box.style.setProperty('outline', 'none', 'important');
-    box.style.setProperty('box-shadow', 'none', 'important');
-  } catch (error) {
-    console.error('Mapbox Search Box failed to mount', error);
-    if (fallback) fallback.placeholder = 'Location unavailable';
-  }
+  });
+
+  input.addEventListener('blur', () => {
+    window.setTimeout(hideSuggestions, 120);
+  });
+
+  clearButton?.addEventListener('click', () => {
+    clearLocation();
+    input.focus();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (event.target instanceof Node && locationHost.contains(event.target)) {
+      return;
+    }
+    hideSuggestions();
+  });
+
+  syncClearButton();
 }
 
 function searchLocationCoords(location: BrowserLocation | undefined) {
@@ -1158,7 +1251,7 @@ function persistCustomDates() {
 function readStoredCategories(): CourseCategoryId[] {
   try {
     const stored = parseCourseCategories(localStorage.getItem(CATEGORY_STORAGE_KEY) || '');
-    return stored.length ? stored : ['beginner'];
+    return stored.length ? [stored[0]] : ['beginner'];
   } catch {
     return ['beginner'];
   }

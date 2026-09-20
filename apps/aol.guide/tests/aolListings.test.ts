@@ -9,7 +9,7 @@ import {
 import { sampleAolCourse } from './helpers.js';
 
 describe('Art of Living live listings', () => {
-  it('calls the public new-search-course API without hash-only or empty params', () => {
+  it('calls the India search API the official course page uses, without hash-only or empty params', () => {
     const url = new URL(
       buildAolApiSearchUrl(
         {
@@ -31,7 +31,7 @@ describe('Art of Living live listings', () => {
     );
 
     expect(url.origin).toBe('https://www.artofliving.org');
-    expect(url.pathname).toBe('/new-search-course');
+    expect(url.pathname).toBe('/india-search-course-api');
     expect(url.searchParams.get('distance')).toBe('60');
     expect(url.searchParams.get('ctype')).toContain('313040');
     expect(url.searchParams.get('limit')).toBe('20');

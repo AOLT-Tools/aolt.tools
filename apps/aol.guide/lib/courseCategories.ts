@@ -78,6 +78,20 @@ export function parseCourseCategories(value: string | undefined): CourseCategory
   return COURSE_CATEGORY_ORDER.filter((id) => seen.has(id));
 }
 
+export function resolveCourseCategory(
+  present: readonly CourseCategoryId[],
+  selected: Iterable<CourseCategoryId>
+): CourseCategoryId | undefined {
+  if (!present.length) return undefined;
+  const chosen = new Set(selected);
+  const kept = COURSE_CATEGORY_ORDER.find(
+    (id) => chosen.has(id) && present.includes(id)
+  );
+  if (kept) return kept;
+  if (present.includes('beginner')) return 'beginner';
+  return present[0];
+}
+
 export function serializeCourseCategories(ids: Iterable<CourseCategoryId>): string {
   const seen = new Set(ids);
   return COURSE_CATEGORY_ORDER.filter((id) => seen.has(id)).join(',');

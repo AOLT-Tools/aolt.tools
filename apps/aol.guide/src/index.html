@@ -113,14 +113,33 @@
             <div class="filter-control" id="location-control">
               <span class="filter-icon" aria-hidden="true">📍</span>
               <div class="filter-control-body" id="location-host">
-                <input
-                  id="location-fallback"
-                  class="filter-input"
-                  type="text"
-                  autocomplete="off"
-                  placeholder="Pick a location"
-                  disabled
-                />
+                <div class="location-input-row">
+                  <input
+                    id="location-input"
+                    class="filter-input"
+                    type="search"
+                    autocomplete="off"
+                    enterkeyhint="search"
+                    placeholder="Pick a location"
+                    disabled
+                  />
+                  <button
+                    type="button"
+                    class="location-clear"
+                    id="location-clear"
+                    hidden
+                    aria-label="Clear location"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div
+                  class="suggestions"
+                  id="location-suggestions"
+                  hidden
+                  role="listbox"
+                  aria-label="Location suggestions"
+                ></div>
               </div>
             </div>
           </div>
@@ -165,6 +184,7 @@
           class="category-chips"
           id="category-chips"
           hidden
+          role="radiogroup"
           aria-label="Program category"
         ></div>
       </section>

@@ -63,7 +63,7 @@ describe('official search service', () => {
     expect(aol?.url).toContain('distance=60');
     expect(aol?.url).toContain('lat=13.041018');
     expect(aol?.url).not.toContain('is_online_event');
-    expect(requestedUrl).toContain('https://www.artofliving.org/new-search-course');
+    expect(requestedUrl).toContain('https://www.artofliving.org/india-search-course-api');
     expect(requestedUrl).toContain('distance=60');
     expect(requestedUrl).toContain('ctype=313040');
     expect(requestedUrl).not.toContain('is_online_event');
@@ -163,7 +163,7 @@ describe('official search service', () => {
           },
           {
             when: (url) =>
-              url.includes('new-search-course') &&
+              url.includes('india-search-course-api') &&
               !url.includes('ctype=' + FOLLOW_UP_COURSE_TYPE_IDS[0]),
             courses: [other],
             total: 1
@@ -250,7 +250,7 @@ describe('official search service', () => {
           },
           {
             when: (url) =>
-              url.includes('new-search-course') &&
+              url.includes('india-search-course-api') &&
               !url.includes('ctype=' + FOLLOW_UP_COURSE_TYPE_IDS[0]),
             courses: [
               sampleAolCourse({

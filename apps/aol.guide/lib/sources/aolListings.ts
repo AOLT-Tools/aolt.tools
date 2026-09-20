@@ -5,7 +5,8 @@ import type {
   ResolvedSearchIntent
 } from '../searchIntent.js';
 
-export const AOL_COURSE_API_URL = 'https://www.artofliving.org/new-search-course';
+export const AOL_COURSE_API_URL =
+  'https://www.artofliving.org/india-search-course-api';
 export const AOL_LISTING_PAGE_SIZE = 20;
 export const AOL_MAX_RING_PAGES = 5;
 

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  buildMapboxTemporaryForwardUrl,
   buildMapboxTemporaryPincodeUrl,
   createMapboxTemporaryPincodeResolver,
+  parseMapboxTemporaryForwardSuggestions,
   parseMapboxTemporaryPincodeResponse
 } from '@aolt/integrations/mapbox/geocode';
 
@@ -26,6 +28,43 @@ function mapboxFeature(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Mapbox Temporary Geocoding PIN lookup', () => {
+  it('builds a temporary autocomplete URL for India place search', () => {
+    const url = new URL(buildMapboxTemporaryForwardUrl('MSR North City', TOKEN));
+    expect(url.origin + url.pathname).toBe(
+      'https://api.mapbox.com/search/geocode/v6/forward'
+    );
+    expect(url.searchParams.get('q')).toBe('MSR North City');
+    expect(url.searchParams.get('country')).toBe('in');
+    expect(url.searchParams.get('language')).toBe('en');
+    expect(url.searchParams.get('autocomplete')).toBe('true');
+    expect(url.searchParams.get('permanent')).toBe('false');
+    expect(url.searchParams.get('access_token')).toBe(TOKEN);
+  });
+
+  it('parses temporary forward suggestions for the location picker', () => {
+    expect(
+      parseMapboxTemporaryForwardSuggestions({
+        features: [
+          mapboxFeature({
+            properties: {
+              name: 'MSR North City',
+              full_address: 'MSR North City, Bengaluru, Karnataka, India',
+              feature_type: 'neighborhood',
+              coordinates: { latitude: 13.041018, longitude: 77.621558 },
+              context: { place: { name: 'Bengaluru' } }
+            }
+          })
+        ]
+      })
+    ).toEqual([
+      {
+        label: 'MSR North City, Bengaluru, Karnataka, India',
+        latitude: 13.041018,
+        longitude: 77.621558,
+        city: 'Bengaluru'
+      }
+    ]);
+  });
   it('builds a temporary forward-geocode URL for an Indian postcode', () => {
     const url = new URL(buildMapboxTemporaryPincodeUrl('560045', TOKEN));
     expect(url.origin + url.pathname).toBe(

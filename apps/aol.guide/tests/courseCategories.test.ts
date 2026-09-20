@@ -7,6 +7,7 @@ import {
   nextAolRadiusKm,
   parseCourseCategories,
   presentCourseCategories,
+  resolveCourseCategory,
   serializeCourseCategories
 } from '../lib/courseCategories.js';
 
@@ -99,5 +100,16 @@ describe('course categories', () => {
     expect(presentCourseCategories([{ category: 'advanced' }, { category: 'beginner' }])).toEqual(
       ['beginner', 'advanced']
     );
+  });
+
+  it('keeps a single present category, never All', () => {
+    expect(resolveCourseCategory(['beginner', 'kids'], ['kids', 'beginner'])).toBe(
+      'beginner'
+    );
+    expect(resolveCourseCategory(['kids', 'advanced'], ['advanced'])).toBe('advanced');
+    expect(resolveCourseCategory(['kids', 'advanced'], [])).toBe('kids');
+    expect(resolveCourseCategory(['beginner', 'kids'], [])).toBe('beginner');
+    expect(resolveCourseCategory(['advanced'], ['kids'])).toBe('advanced');
+    expect(resolveCourseCategory([], ['beginner'])).toBeUndefined();
   });
 });

@@ -48,6 +48,13 @@ export function createMapboxTemporaryPincodeResolver(
   };
 }
 
+export type MapboxTemporaryForwardSuggestion = {
+  label: string;
+  latitude: number;
+  longitude: number;
+  city?: string;
+};
+
 export function buildMapboxTemporaryPincodeUrl(
   pincode: string,
   accessToken: string
@@ -61,6 +68,49 @@ export function buildMapboxTemporaryPincodeUrl(
   url.searchParams.set('permanent', 'false');
   url.searchParams.set('access_token', accessToken);
   return url.toString();
+}
+
+export function buildMapboxTemporaryForwardUrl(
+  query: string,
+  accessToken: string,
+  options: { limit?: number } = {}
+): string {
+  const url = new URL(MAPBOX_GEOCODE_FORWARD_URL);
+  url.searchParams.set('q', query.trim());
+  url.searchParams.set('country', 'in');
+  url.searchParams.set('language', 'en');
+  url.searchParams.set('limit', String(options.limit || 5));
+  url.searchParams.set('autocomplete', 'true');
+  url.searchParams.set('permanent', 'false');
+  url.searchParams.set('access_token', accessToken);
+  return url.toString();
+}
+
+export function parseMapboxTemporaryForwardSuggestions(
+  payload: unknown
+): MapboxTemporaryForwardSuggestion[] {
+  const features = readRecord(payload)?.features;
+  if (!Array.isArray(features)) return [];
+  const suggestions: MapboxTemporaryForwardSuggestion[] = [];
+  for (const item of features) {
+    const feature = readRecord(item);
+    if (!feature) continue;
+    const properties = readRecord(feature.properties) || {};
+    const point = coordinatesFromFeature(feature, properties);
+    const label =
+      readString(properties.full_address) ||
+      readString(properties.name_preferred) ||
+      readString(properties.name) ||
+      readString(properties.place_formatted);
+    if (!point || !label) continue;
+    suggestions.push({
+      label,
+      latitude: point.latitude,
+      longitude: point.longitude,
+      city: contextName(properties, 'place') || contextName(properties, 'locality')
+    });
+  }
+  return suggestions;
 }
 
 export function parseMapboxTemporaryPincodeResponse(
