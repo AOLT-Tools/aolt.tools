@@ -33,6 +33,7 @@ export const COURSE_CATEGORY_LABELS: Record<CourseFilterId, string> = {
 export const AOL_RADIUS_LADDER_KM = [3, 10, 25, 50] as const;
 
 const KIDS_TITLE = /\b(kids?|junior|teens?|child(?:ren)?)\b/i;
+const IP2_TITLE = /\b(?:ip\s*2|intuition\s+process\s*2|intuition\s+program\s*2)\b/i;
 const SAHAJ_TITLE = /sahaj\s+samadhi/i;
 const SATSANG_TITLE = /\bsatsangs?\b/i;
 
@@ -40,6 +41,7 @@ const CATEGORY_BY_CODE: Record<string, CourseCategoryId> = {
   HP: 'beginner',
   MEDHA: 'kids',
   UTKARSHA: 'kids',
+  IP2: 'kids',
   IP: 'other',
   SSY: 'yoga',
   SSDY: 'beginner',
@@ -129,6 +131,7 @@ export function categorizeCourse(input: {
   const title = input.title || '';
   const code = resolveCourseCode(input.courseCode, input.courseTypeId);
   if (code === 'SSDY' || SAHAJ_TITLE.test(title)) return 'beginner';
+  if (code === 'IP2' || IP2_TITLE.test(title)) return 'kids';
   if (code === 'IP' && KIDS_TITLE.test(title)) return 'kids';
   if (code && CATEGORY_BY_CODE[code]) return CATEGORY_BY_CODE[code];
   if (SATSANG_TITLE.test(title)) return 'regular_connects';

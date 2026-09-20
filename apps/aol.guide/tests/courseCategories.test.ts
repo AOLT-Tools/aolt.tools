@@ -50,6 +50,14 @@ describe('course categories', () => {
     );
   });
 
+  it('maps IP2 into Kids', () => {
+    expect(categorizeCourse({ title: 'IP2' })).toBe('kids');
+    expect(categorizeCourse({ title: 'Intuition Process 2' })).toBe('kids');
+    expect(
+      categorizeCourse({ courseTypeId: '377106', title: 'Intuition Process 2' })
+    ).toBe('kids');
+  });
+
   it('maps Volunteer Training with AMP into Advanced', () => {
     expect(
       categorizeCourse({ courseTypeId: '55116', title: 'Volunteer Training Program' })

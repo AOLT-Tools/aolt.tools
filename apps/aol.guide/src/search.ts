@@ -711,7 +711,7 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
     const register = document.createElement('span');
     register.className = 'register-affordance';
     register.textContent =
-      currentSource === 'center' ? 'More Info →' : 'Register →';
+      currentSource === 'center' ? 'More Info' : 'Register';
     header.append(register);
     makeCardClickable(card, url);
   }

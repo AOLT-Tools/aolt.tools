@@ -65,6 +65,12 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
     keywords: ['sanyam', 'sanyam level 1', 'sanyam level one']
   },
   {
+    code: 'IP2',
+    label: 'Intuition Process 2',
+    typeIds: [],
+    keywords: ['ip2', 'ip 2', 'intuition process 2', 'intuition program 2']
+  },
+  {
     code: 'IP',
     label: 'Intuition Process',
     typeIds: [
