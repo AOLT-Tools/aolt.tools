@@ -19,15 +19,11 @@ Only this source file is allowed under `apps/aol.guide/api` and therefore become
 
 `pnpm build` runs `scripts/verify-functions.mjs` first and fails if another deployable JS/TS file is accidentally placed under `api/`.
 
-AOL Guide does not use Postgres, sync jobs, or cron. It parses a query and translates it into official Art of Living, VVMVP, and Vaidic Puja search URLs, then loads live AOL listings from `new-search-course`.
+AOL Guide does not use Postgres, sync jobs, or cron. It loads live listings from `india-search-course-api` using catalog filters (source, mode, Mapbox coordinates, radius, dates).
 
 ### Important AOL Guide environment variables
 
-See `apps/aol.guide/.env.sample`. Optional production values include:
-
-- `AOL_GUIDE_MAPBOX_TOKEN` for PIN → lat/lng via Mapbox Temporary Geocoding (falls back to `data/pincodes.json`)
-- `AOL_GUIDE_GEMINI_API_KEY` if Gemini parsing is enabled
-- `DATA_GOV_IN_API_KEY` to refresh the local PIN dataset
+- `AOL_GUIDE_MAPBOX_TOKEN` for browser place suggestions via Mapbox Temporary Geocoding (`permanent=false`). Do not use Search Box Sessions.
 
 ## Seva Hub
 

@@ -8,7 +8,7 @@ import type {
 export const AOL_COURSE_API_URL =
   'https://www.artofliving.org/india-search-course-api';
 export const AOL_LISTING_PAGE_SIZE = 20;
-export const AOL_MAX_RING_PAGES = 5;
+export const AOL_MAX_RING_PAGES = 1;
 
 const HASH_ONLY_KEYS = new Set(['selectedLocName', 'mode']);
 
@@ -218,15 +218,6 @@ export function filterListingsByIntent(
   intent: ResolvedSearchIntent
 ): OfficialCourseListing[] {
   return listings.filter((listing) => listingMatchesIntent(listing, intent));
-}
-
-export function refineAolListingPage(
-  page: AolListingPage,
-  intent: ResolvedSearchIntent
-): AolListingPage {
-  const listings = filterListingsByIntent(page.listings, intent);
-  if (listings.length === page.listings.length) return { ...page, listings };
-  return { listings, total: listings.length };
 }
 
 function listingMatchesIntent(

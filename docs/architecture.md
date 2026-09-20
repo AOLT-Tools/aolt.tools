@@ -33,7 +33,7 @@ AOL Guide deploys only:
 
 - `apps/aol.guide/api/search.ts`
 
-It is an NLP wrapper over official Art of Living / VVMVP / Vaidic Puja search pages. It does not keep a course database or run sync jobs.
+It is a live catalog over official Art of Living listings. It does not keep a course database, run sync jobs, or parse natural-language queries in the app.
 
 Seva Hub deploys only:
 

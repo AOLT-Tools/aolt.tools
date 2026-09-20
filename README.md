@@ -2,7 +2,7 @@
 
 AOLT Tools is a pnpm workspace containing two independently deployable applications:
 
-- `apps/aol.guide` — AOL Guide (NLP wrapper over official search pages)
+- `apps/aol.guide` — AOL Guide (live catalog over official course listings)
 - `apps/seva.hub` — Seva Hub
 
 Shared platform code lives under `packages/`:

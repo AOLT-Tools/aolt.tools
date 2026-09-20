@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   LOCATION_SUGGEST_DEBOUNCE_MS,
   LOCATION_SUGGEST_MIN_CHARS,
-  locationFromMapboxRetrieve,
   shouldSuggestLocationQuery,
   suggestMapboxTemporaryLocations
 } from '../src/mapboxSearchJs.js';
@@ -12,60 +11,8 @@ import {
   resolveOnlineTimePreset
 } from '../lib/dateRanges.js';
 
-describe('browser Mapbox retrieve parsing', () => {
-  it('reads coordinates from a Search Box retrieve payload', () => {
-    expect(
-      locationFromMapboxRetrieve({
-        features: [
-          {
-            geometry: { type: 'Point', coordinates: [77.6446, 12.9121] },
-            properties: {
-              name: 'HSR Layout',
-              coordinates: { latitude: 12.9121, longitude: 77.6446 },
-              context: {
-                place: { name: 'Bengaluru' },
-                postcode: { name: '560102' }
-              }
-            }
-          }
-        ]
-      })
-    ).toEqual({
-      label: 'HSR Layout',
-      latitude: 12.9121,
-      longitude: 77.6446,
-      city: 'Bengaluru'
-    });
-  });
-
-  it('reads lat/lng aliases and ignores the Mapbox postcode', () => {
-    expect(
-      locationFromMapboxRetrieve({
-        features: [
-          {
-            geometry: { type: 'Point', coordinates: [77.621558, 13.041018] },
-            properties: {
-              name: 'MSR North City',
-              coordinates: { lat: 13.041018, lng: 77.621558 },
-              context: {
-                place: { name: 'Bengaluru' },
-                postcode: { name: '560077' }
-              }
-            }
-          }
-        ]
-      })
-    ).toEqual({
-      label: 'MSR North City',
-      latitude: 13.041018,
-      longitude: 77.621558,
-      city: 'Bengaluru'
-    });
-  });
-});
-
 describe('temporary location suggest', () => {
-  it('waits 300ms and ignores queries shorter than 3 characters', async () => {
+  it('waits 500ms and ignores queries shorter than 3 characters', async () => {
     const fetchImpl = vi.fn() as typeof fetch;
     expect(LOCATION_SUGGEST_DEBOUNCE_MS).toBe(500);
     expect(LOCATION_SUGGEST_MIN_CHARS).toBe(3);
@@ -113,6 +60,8 @@ describe('temporary location suggest', () => {
     expect(requested[0]).toContain('permanent=false');
     expect(requested[0]).toContain('autocomplete=true');
     expect(requested[0]).not.toContain('permanent=true');
+    expect(requested[0]).not.toContain('session_token');
+    expect(requested[0]).not.toContain('search/searchbox');
   });
 });
 

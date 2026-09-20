@@ -2,106 +2,75 @@
 
 ## Before
 
-The previous AOL Guide (in the aolt.tools monorepo) synced official listings into Postgres:
-
-```text
-AOL / VVMVP / VDS sources
-        |
-        v
-sync jobs + Neon/Postgres
-        |
-        v
-SQL search over local copies
-        |
-        v
-CLI / API / browser
-```
-
-That path depended on `aol_guide_courses`, `aol_guide_activities`, `aol_guide_vds_events`, background sync, and listing SQL.
+The previous AOL Guide synced official listings into Postgres and searched local copies. That path is gone.
 
 ## After
 
-This app is an NLP wrapper over official search pages. There is no course/program database.
+This app is a live catalog over official search APIs. There is no course/program database and no NLP query box in the product UI.
 
 ```text
-user query
-    |
-    v
-deterministic parser
-    |
-    +-- if complete --> SearchIntent
-    |
-    +-- else optional Gemini --> SearchIntent
-    |
-    v
-PIN coordinate resolver (Mapbox Temporary Geocoding, else data/pincodes.json)
-    |
-    v
-source router
-    |
-    +--> AOL adapter  --> official hash URL + live listings JSON
-    +--> VVMVP adapter --> /ashrams/bangalore/?search=
-    +--> VDS adapter   --> canonical register.vaidicpujas.in
-    |
-    v
-browser: interpreted filters + live AOL listings + source cards
+Courses | Center  +  In-person | Online  +  Mapbox place
+        |
+        v
+POST /api/search  { source, mode, dates, radiusKm, location }
+        |
+        v
+AOL adapter --> official hash URL + india-search-course-api listings
+VVMVP / VDS adapters remain for catalog source ids (not in the top toggle)
+        |
+        v
+browser: listing cards (Register / More Info)
 ```
 
-AOL listings are fetched live from the public `new-search-course` JSON API at request time. They are not stored.
+Place suggestions use Mapbox Temporary Geocoding (`permanent=false`). Search Box Sessions are not used.
 
-## SearchIntent
+## Catalog request
 
 ```ts
-type SearchIntent = {
-  source?: 'aol' | 'vvmvp' | 'vds' | 'all';
-  courseCode?: string;
-  courseLabel?: string;
-  pincode?: string;
-  city?: string;
-  latitude?: number;
-  longitude?: number;
-  radiusKm?: number;
-  language?: string;
-  deliveryMode?: 'online' | 'in_person' | 'any';
+type OfficialSearchRequest = {
+  source: 'aol' | 'center' | 'vvmvp' | 'vds';
+  mode?: 'in_person' | 'online';
+  location?: { label: string; latitude: number; longitude: number; city?: string };
+  datePreset?: 'anytime' | 'today' | 'tomorrow' | 'this_weekend' | 'next_7_days' | 'custom';
   dateFrom?: string;
   dateTo?: string;
-  startTimeFrom?: string;
-  startTimeTo?: string;
-  teacher?: string;
-  keywords?: string[];
+  radiusKm?: number;
 };
 ```
 
-Intent stays source-independent. Adapters own URL construction.
+Courses (`aol`) drop Follow-up and Satsang. Center keeps those in-person listings.
 
 ## Modules
 
 ```text
 lib/searchIntent.ts
-lib/queryParser.ts
-lib/pincodeCoordinates.ts   # bundled PIN JSON + Mapbox-then-local fallback
+lib/searchService.ts
+lib/searchRequest.ts
 lib/sourceRouter.ts
+lib/courseCategories.ts
 lib/sources/aolSearchAdapter.ts
 lib/sources/aolListings.ts
 lib/sources/vvmvpSearchAdapter.ts
 lib/sources/vdsSearchAdapter.ts
-src/searchSuggestions.ts
+src/search.ts
+src/mapboxSearchJs.ts
 ```
 
 Shared platform helpers used by this app:
 
-- `@aolt/core/normalization` — Indian PIN
+- `@aolt/core/geo` — lat/lng validation
 - `@aolt/core/dates` — IST calendar and weekend presets
-- `@aolt/core/local-env` — `.env` / `.env.local` for CLI
-- `@aolt/integrations/mapbox/geocode` — Mapbox Temporary Geocoding (not stored)
-- `@aolt/integrations/gemini/json` — Gemini JSON generateContent client
+- `@aolt/core/local-env` — `.env` / `.env.local`
+- `@aolt/integrations/mapbox/geocode` — Temporary Geocoding (not stored)
+- `@aolt/integrations/gemini/json` — Gemini JSON client (framework only; this app does not call it)
 
 ## What this app does not do
 
 - Neon/Postgres or listing SQL
-- Sync jobs or local copies of program rows
+- Bundled PIN datasets
+- Natural-language query parsing in the AOL Guide app
+- Search Box Sessions or `@mapbox/search-js-web`
 - Scraping official pages into a backend
 - Invented VVMVP/VDS query parameters
 - Proxying third-party pages to bypass iframe/CORS
 - Seva Hub changes
-- Advanced search forms

@@ -40,8 +40,7 @@ export default defineConfig(({ mode }) => {
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(appDir, 'src/index.html'),
-        mapboxAutofill: resolve(appDir, 'src/mapbox-autofill.html')
+        main: resolve(appDir, 'src/index.html')
       },
       output: {
         entryFileNames: 'assets/aol-guide/[name]-[hash].js',
@@ -80,7 +79,6 @@ function attachSearchApi(server: {
 
     try {
       const body = JSON.parse(await readBody(req)) as Record<string, unknown>;
-      const query = String(body.query || '').trim();
       const { createOfficialSearchService } = await import('./lib/factory.ts');
       const {
         parseSearchMode,
@@ -91,16 +89,15 @@ function attachSearchApi(server: {
         readLocation
       } = await import('./lib/searchRequest.ts');
       const source = parseSearchSource(body.source);
-      if (!source && !query) {
+      if (!source) {
         res.statusCode = 400;
         res.setHeader('content-type', 'application/json');
         res.end(
-          JSON.stringify({ success: false, error: { message: 'Query is required.' } })
+          JSON.stringify({ success: false, error: { message: 'Source is required.' } })
         );
         return;
       }
       const result = await createOfficialSearchService().search({
-        query,
         source,
         mode: parseSearchMode(body.mode),
         datePreset: parseDatePreset(body.datePreset),

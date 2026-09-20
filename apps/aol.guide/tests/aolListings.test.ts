@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { parseSearchQuery } from '../lib/queryParser.js';
 import {
+  AOL_LISTING_PAGE_SIZE,
+  AOL_MAX_RING_PAGES,
   buildAolApiSearchUrl,
+  fetchAolListingsForRadius,
   filterListingsByIntent,
   normalizeAolListing,
   sortListingsByDistance
 } from '../lib/sources/aolListings.js';
-import { sampleAolCourse } from './helpers.js';
+import { aolListingsFetchMock, sampleAolCourse, testIntent } from './helpers.js';
 
 describe('Art of Living live listings', () => {
   it('calls the India search API the official course page uses, without hash-only or empty params', () => {
@@ -102,10 +104,28 @@ describe('Art of Living live listings', () => {
     );
     const listings = [alex, sam, online].filter((item) => item != null);
     expect(
-      filterListingsByIntent(listings, {
-        ...parseSearchQuery('teacher Alex', { now: new Date('2026-09-04T06:30:00.000Z') }),
-        deliveryMode: 'in_person'
-      }).map((item) => item.title)
+      filterListingsByIntent(
+        listings,
+        testIntent({
+          teacher: 'Alex',
+          deliveryMode: 'in_person'
+        })
+      ).map((item) => item.title)
     ).toEqual(['Alex Follow Up']);
+  });
+
+  it('fetches a single listings page for a radius search', async () => {
+    const requested: string[] = [];
+    const courses = Array.from({ length: AOL_LISTING_PAGE_SIZE }, (_, index) =>
+      sampleAolCourse({ sao_id: 1000 + index, title: 'Course ' + (index + 1) })
+    );
+    const page = await fetchAolListingsForRadius(
+      { lat: '12.9121', lng: '77.6446', distance: '10' },
+      { fetchImpl: aolListingsFetchMock(courses, 80, requested) }
+    );
+    expect(AOL_MAX_RING_PAGES).toBe(1);
+    expect(requested).toHaveLength(1);
+    expect(page.listings).toHaveLength(AOL_LISTING_PAGE_SIZE);
+    expect(page.total).toBe(80);
   });
 });

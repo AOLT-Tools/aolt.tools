@@ -17,6 +17,7 @@ import {
   todayInIndia,
   type OnlineTimePreset
 } from '../lib/dateRanges.js';
+import type { OfficialCourseListing } from '../lib/searchIntent.js';
 import {
   LOCATION_SUGGEST_DEBOUNCE_MS,
   shouldSuggestLocationQuery,
@@ -27,27 +28,6 @@ import {
 type SearchSource = 'aol' | 'center' | 'vvmvp' | 'vds';
 type SearchMode = 'in_person' | 'online';
 type TimePreset = OnlineTimePreset;
-
-type OfficialCourseListing = {
-  id: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  city: string;
-  address: string;
-  pincode: string;
-  location: string;
-  distanceKm: number | null;
-  isOnline: boolean;
-  languages: string[];
-  teachers: string[];
-  schedule: string;
-  fee: string;
-  registerUrl: string;
-  detailUrl: string;
-  courseTypeId?: string;
-  category?: string;
-};
 
 type SourceSearchResult = {
   source: string;

@@ -1,21 +1,25 @@
-import {
-  createStaticPincodeCoordinateResolver,
-  type PincodeCoordinate,
-  type PincodeCoordinateResolver
-} from '../lib/pincodeCoordinates.js';
+import type { ResolvedSearchIntent } from '../lib/searchIntent.js';
 
-export const SAMPLE_PIN_560045: PincodeCoordinate = {
-  pincode: '560045',
+export const SAMPLE_COORDS = {
   latitude: 13.041018,
   longitude: 77.621558,
-  city: 'Bengaluru',
-  state: 'Karnataka'
-};
+  city: 'Bengaluru'
+} as const;
 
-export function testPincodeResolver(
-  records: readonly PincodeCoordinate[] = [SAMPLE_PIN_560045]
-): PincodeCoordinateResolver {
-  return createStaticPincodeCoordinateResolver(records);
+export function testIntent(
+  overrides: Partial<ResolvedSearchIntent> = {}
+): ResolvedSearchIntent {
+  return {
+    rawQuery: '',
+    confidence: 'high',
+    courseTypeIds: [],
+    ashramMentioned: false,
+    vdsMentioned: false,
+    courseMentioned: false,
+    pincodeResolved: false,
+    messages: [],
+    ...overrides
+  };
 }
 
 export function sampleAolCourse(overrides: Record<string, unknown> = {}) {
@@ -42,41 +46,6 @@ export function sampleAolCourse(overrides: Record<string, unknown> = {}) {
     link: 'www.artofliving.org/in-en/program/1050180',
     ...overrides
   };
-}
-
-export function sequentialAolListingsFetchMock(
-  pages: Array<{
-    when: (url: string) => boolean;
-    courses: unknown[];
-    total?: number;
-  }>,
-  requestedUrls?: string[]
-): typeof fetch {
-  return (async (input: Parameters<typeof fetch>[0]) => {
-    const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
-    requestedUrls?.push(url);
-    const page = pages.find((entry) => entry.when(url)) || {
-      courses: [] as unknown[],
-      total: 0
-    };
-    return new Response(
-      JSON.stringify({
-        courses: page.courses,
-        total: page.total ?? page.courses.length,
-        limit: 20,
-        offset: 1
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }) as typeof fetch;
 }
 
 export function aolListingsFetchMock(

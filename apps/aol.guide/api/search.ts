@@ -11,8 +11,7 @@ import {
 } from '../lib/searchRequest.js';
 
 const SearchBodySchema = z.object({
-  query: z.string().trim().optional().default(''),
-  source: z.enum(['aol', 'center', 'vvmvp', 'vds']).optional(),
+  source: z.enum(['aol', 'center', 'vvmvp', 'vds']),
   mode: z.enum(['in_person', 'online']).optional(),
   datePreset: z
     .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days', 'custom'])
@@ -41,15 +40,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = SearchBodySchema.parse(readBody(req));
-    if (!body.source && !body.query) {
+    const source = parseSearchSource(body.source);
+    if (!source) {
       return res.status(400).json({
         success: false,
-        error: { message: 'Query is required.' }
+        error: { message: 'Source is required.' }
       });
     }
     const result = await createOfficialSearchService().search({
-      query: body.query,
-      source: parseSearchSource(body.source),
+      source,
       mode: parseSearchMode(body.mode),
       datePreset: parseDatePreset(body.datePreset),
       dateFrom: parseIsoDate(body.dateFrom),

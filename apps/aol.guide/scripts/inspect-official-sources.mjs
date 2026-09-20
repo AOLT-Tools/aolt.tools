@@ -152,6 +152,7 @@ for (const src of aolScriptCandidates.slice(0, 8)) {
             'start_date_from',
             'ctype',
             'location.hash',
+            'india-search-course-api',
             'new-search-course',
             'distance'
           ])

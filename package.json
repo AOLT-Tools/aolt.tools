@@ -21,8 +21,6 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "pnpm build:packages && vitest run",
-    "aol-guide:search": "pnpm --dir apps/aol.guide search",
-    "aol-guide:pincodes": "pnpm --dir apps/aol.guide pincodes",
     "seva:env-check": "pnpm --dir apps/seva.hub env:check",
     "seva:sheets-template": "pnpm --dir apps/seva.hub sheets:template",
     "seva:sheets-doctor": "pnpm --dir apps/seva.hub sheets:doctor"

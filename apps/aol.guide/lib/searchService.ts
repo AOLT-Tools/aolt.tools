@@ -1,19 +1,10 @@
 import { isValidLatitude, isValidLongitude } from '@aolt/core/geo';
-import {
-  FOLLOW_UP_COURSE_TYPE_IDS,
-  findCourseAliasByCode
-} from './courseAliases.js';
 import { isRegularConnectListing } from './courseCategories.js';
 import {
   resolveCustomDateRange,
   resolveOnlineTimePreset,
   type OnlineTimePreset
 } from './dateRanges.js';
-import {
-  isDeterministicParseComplete,
-  parseSearchQuery
-} from './queryParser.js';
-import type { PincodeCoordinateResolver } from './pincodeCoordinates.js';
 import type {
   OfficialCourseListing,
   ResolvedSearchIntent,
@@ -21,18 +12,12 @@ import type {
   SourceSearchResult
 } from './searchIntent.js';
 import {
-  fetchAolCourseListings,
   fetchAolListingsForRadius,
-  refineAolListingPage,
   type AolListingPage
 } from './sources/aolListings.js';
 import { aolSearchAdapter, buildAolFilters } from './sources/aolSearchAdapter.js';
 import { fetchVvmvpBangaloreListings } from './sources/vvmvpListings.js';
-import { routeSources, SEARCH_SOURCE_ADAPTERS } from './sourceRouter.js';
-
-export type IntentParser = {
-  parse(query: string): Promise<ResolvedSearchIntent | null>;
-};
+import { adapterIdForSource, SEARCH_SOURCE_ADAPTERS } from './sourceRouter.js';
 
 export type SearchMode = 'in_person' | 'online';
 
@@ -44,8 +29,7 @@ export type SelectedSearchLocation = {
 };
 
 export type OfficialSearchRequest = {
-  query?: string;
-  source?: SearchSourceId;
+  source: SearchSourceId;
   mode?: SearchMode;
   location?: SelectedSearchLocation;
   datePreset?: OnlineTimePreset;
@@ -55,137 +39,64 @@ export type OfficialSearchRequest = {
 };
 
 export type OfficialSearchServiceOptions = {
-  pincodeResolver: PincodeCoordinateResolver;
-  nlpParser?: IntentParser;
   now?: Date;
   fetchImpl?: typeof fetch;
   aolListingLimit?: number;
 };
 
 export type OfficialSearchResponse = {
-  query: string;
   intent: ResolvedSearchIntent;
   interpretation: Array<{ label: string; value: string }>;
   sources: SourceSearchResult[];
-  usedGemini: boolean;
   messages: string[];
 };
 
 export class OfficialSearchService {
-  constructor(private readonly options: OfficialSearchServiceOptions) {}
+  constructor(private readonly options: OfficialSearchServiceOptions = {}) {}
 
-  async search(
-    input: string | OfficialSearchRequest
-  ): Promise<OfficialSearchResponse> {
-    const request = normalizeSearchRequest(input);
-    if (request.source) {
-      return this.searchCatalog(request);
-    }
-    return this.searchQuery(request);
-  }
-
-  private async searchQuery(
-    request: OfficialSearchRequest
-  ): Promise<OfficialSearchResponse> {
-    const trimmed = request.query || '';
+  async search(request: OfficialSearchRequest): Promise<OfficialSearchResponse> {
     const now = this.options.now || new Date();
-    let intent = parseSearchQuery(trimmed, { now });
-    let usedGemini = false;
-
-    if (!isDeterministicParseComplete(intent) && this.options.nlpParser) {
-      const parsed = await this.options.nlpParser.parse(trimmed);
-      if (parsed) {
-        intent = parsed;
-        usedGemini = true;
-      }
-    }
-
-    intent = applySearchControls(intent, request, now);
-    if (
-      request.mode !== 'online' &&
-      (typeof intent.latitude !== 'number' || typeof intent.longitude !== 'number')
-    ) {
-      intent = await resolvePincodeCoordinates(intent, this.options.pincodeResolver);
-    }
-
-    const sourceIds = routeSources(intent);
-    const adapters = sourceIds
-      .map((id) => SEARCH_SOURCE_ADAPTERS.find((adapter) => adapter.id === id))
-      .filter((adapter) => adapter != null);
-    const sources = adapters.map((adapter) => adapter.buildResult(intent, now));
-    const messages = [...intent.messages];
-    if (usedGemini) {
-      messages.push('Used Gemini only to interpret the query, not to search programs.');
-    }
-
-    let displayIntent = intent;
-    await Promise.all(
-      sources.map(async (source) => {
-        const usedIntent = await this.attachOfficialListings(
-          source,
-          intent,
-          now,
-          messages
-        );
-        if (usedIntent) displayIntent = usedIntent;
-      })
-    );
-
-    return {
-      query: trimmed,
-      intent: displayIntent,
-      interpretation: describeIntent(displayIntent, request.location),
-      sources,
-      usedGemini,
-      messages
-    };
-  }
-
-  private async searchCatalog(
-    request: OfficialSearchRequest
-  ): Promise<OfficialSearchResponse> {
-    const now = this.options.now || new Date();
-    const sourceId = request.source || 'aol';
     const intent = catalogIntent(request, now);
-    const adapterId = sourceId === 'center' ? 'aol' : sourceId;
-    const adapter = SEARCH_SOURCE_ADAPTERS.find((item) => item.id === adapterId);
+    const adapter = SEARCH_SOURCE_ADAPTERS.find(
+      (item) => item.id === adapterIdForSource(request.source)
+    );
     const messages = [...intent.messages];
     if (!adapter) {
       return {
-        query: '',
         intent,
         interpretation: describeIntent(intent, request.location),
         sources: [],
-        usedGemini: false,
         messages
       };
     }
 
     const source = adapter.buildResult(intent, now);
-    if (sourceId === 'aol' || sourceId === 'center') {
-      await this.attachCatalogListings(source, intent, now, messages);
-      source.listings = filterAolCatalogListings(sourceId, source.listings || []);
-      if (sourceId === 'center') source.source = 'center';
-    } else if (sourceId === 'vvmvp') {
-      await this.attachVvmvpCatalogListings(source, messages);
+    await this.attachListings(source, intent, now, messages);
+    if (request.source === 'aol' || request.source === 'center') {
+      source.listings = filterAolCatalogListings(request.source, source.listings || []);
     }
+    if (request.source === 'center') source.source = 'center';
 
     return {
-      query: '',
       intent,
       interpretation: describeIntent(intent, request.location),
       sources: [source],
-      usedGemini: false,
       messages
     };
   }
 
-  private async attachCatalogListings(
+  private async attachListings(
     source: SourceSearchResult,
     intent: ResolvedSearchIntent,
     now: Date,
     messages: string[]
   ): Promise<void> {
+    if (source.source === 'vvmvp') {
+      await this.attachVvmvpListings(source, messages);
+      return;
+    }
+    if (source.source !== 'aol' && source.source !== 'center') return;
+
     try {
       if (
         intent.deliveryMode === 'in_person' &&
@@ -195,11 +106,15 @@ export class OfficialSearchService {
         source.listingTotal = 0;
         return;
       }
-      const page = await fetchAolListingsForRadius(buildAolFilters(intent, now), {
-        fetchImpl: this.options.fetchImpl,
-        limit: this.options.aolListingLimit
-      });
-      applyAolListingResult(source, intent, page, now);
+      applyAolListingResult(
+        source,
+        intent,
+        await fetchAolListingsForRadius(buildAolFilters(intent, now), {
+          fetchImpl: this.options.fetchImpl,
+          limit: this.options.aolListingLimit
+        }),
+        now
+      );
     } catch (error) {
       const detail =
         error instanceof Error ? error.message : 'Could not load Art of Living listings.';
@@ -210,7 +125,7 @@ export class OfficialSearchService {
     }
   }
 
-  private async attachVvmvpCatalogListings(
+  private async attachVvmvpListings(
     source: SourceSearchResult,
     messages: string[]
   ): Promise<void> {
@@ -232,86 +147,6 @@ export class OfficialSearchService {
       );
     }
   }
-
-  private async attachOfficialListings(
-    source: SourceSearchResult,
-    intent: ResolvedSearchIntent,
-    now: Date,
-    messages: string[]
-  ): Promise<ResolvedSearchIntent | undefined> {
-    if (source.source !== 'aol') return undefined;
-
-    const followUpIntent = intent.teacher ? applyFollowUpProgramType(intent) : null;
-    const fallbackIntent = followUpIntent
-      ? fallbackIntentAfterFollowUp(intent)
-      : undefined;
-
-    try {
-      let usedIntent = followUpIntent || intent;
-      let page = await this.fetchAolPage(usedIntent, now);
-
-      if (followUpIntent && fallbackIntent && !hasAolListings(page)) {
-        usedIntent = fallbackIntent;
-        page = await this.fetchAolPage(usedIntent, now);
-        messages.push(
-          'No Follow Up programs matched these filters, so other programs with the same location and date filters are shown.'
-        );
-      }
-
-      applyAolListingResult(source, usedIntent, page, now);
-      return usedIntent;
-    } catch (error) {
-      const detail =
-        error instanceof Error ? error.message : 'Could not load Art of Living listings.';
-      source.listingError = detail;
-      messages.push(
-        'Official Art of Living listings could not be loaded. Use View official results to open the same search on artofliving.org.'
-      );
-      return undefined;
-    }
-  }
-
-  private async fetchAolPage(
-    intent: ResolvedSearchIntent,
-    now: Date
-  ): Promise<AolListingPage> {
-    const page = await fetchAolCourseListings(buildAolFilters(intent, now), {
-      fetchImpl: this.options.fetchImpl,
-      limit: this.options.aolListingLimit
-    });
-    return refineAolListingPage(page, intent);
-  }
-}
-
-export function applyFollowUpProgramType(
-  intent: ResolvedSearchIntent
-): ResolvedSearchIntent {
-  const alias = findCourseAliasByCode('FOLLOW_UP');
-  return {
-    ...intent,
-    courseCode: 'FOLLOW_UP',
-    courseLabel: alias?.label || 'Follow Up',
-    courseTypeIds: [...FOLLOW_UP_COURSE_TYPE_IDS],
-    courseMentioned: true
-  };
-}
-
-export function fallbackIntentAfterFollowUp(
-  original: ResolvedSearchIntent
-): ResolvedSearchIntent {
-  if (original.courseCode && original.courseCode !== 'FOLLOW_UP') {
-    return original;
-  }
-  return {
-    ...original,
-    courseCode: undefined,
-    courseLabel: undefined,
-    courseTypeIds: []
-  };
-}
-
-function hasAolListings(page: AolListingPage): boolean {
-  return page.listings.length > 0 || page.total > 0;
 }
 
 function applyAolListingResult(
@@ -330,39 +165,6 @@ function applyAolListingResult(
   source.listingTotal = page.total;
 }
 
-export async function resolvePincodeCoordinates(
-  intent: ResolvedSearchIntent,
-  resolver: PincodeCoordinateResolver
-): Promise<ResolvedSearchIntent> {
-  if (!intent.pincode) {
-    return { ...intent, pincodeResolved: false };
-  }
-
-  const match = await resolver.resolve(intent.pincode);
-  if (!match) {
-    return {
-      ...intent,
-      latitude: undefined,
-      longitude: undefined,
-      pincodeResolved: false,
-      messages: [
-        ...intent.messages,
-        'PIN ' +
-          intent.pincode +
-          ' is kept as the selected location, but coordinates could not be resolved. An unrelated location was not substituted.'
-      ]
-    };
-  }
-
-  return {
-    ...intent,
-    latitude: match.latitude,
-    longitude: match.longitude,
-    pincodeResolved: true,
-    city: intent.city || match.city
-  };
-}
-
 export function describeIntent(
   intent: ResolvedSearchIntent,
   location?: SelectedSearchLocation
@@ -373,22 +175,11 @@ export function describeIntent(
       label: 'Looking for',
       value: intent.courseLabel || intent.courseCode || ''
     });
-  } else if (intent.eventType) {
-    const distinctive = (intent.keywords || []).find((keyword) =>
-      ['rudra', 'guru', 'gau'].includes(keyword)
-    );
-    rows.push({
-      label: 'Looking for',
-      value: distinctive
-        ? titleCase(distinctive) + ' ' + titleCase(intent.eventType)
-        : titleCase(intent.eventType)
-    });
   } else if (intent.keywords?.length) {
     rows.push({ label: 'Looking for', value: intent.keywords.join(' ') });
   }
   if (intent.deliveryMode !== 'online') {
-    if (intent.pincode) rows.push({ label: 'Near', value: intent.pincode });
-    else if (location) rows.push({ label: 'Near', value: location.label });
+    if (location) rows.push({ label: 'Near', value: location.label });
     else if (intent.city) rows.push({ label: 'Near', value: intent.city });
     if (typeof intent.radiusKm === 'number') {
       rows.push({ label: 'Within', value: String(intent.radiusKm) + ' km' });
@@ -412,33 +203,11 @@ export function describeIntent(
   return rows;
 }
 
-function titleCase(value: string): string {
-  return value.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
-}
-
-function normalizeSearchRequest(
-  input: string | OfficialSearchRequest
-): OfficialSearchRequest {
-  if (typeof input === 'string') {
-    return { query: input.trim() };
-  }
-  return {
-    query: (input.query || '').trim(),
-    source: input.source,
-    mode: input.mode,
-    location: input.location,
-    datePreset: input.datePreset,
-    dateFrom: input.dateFrom,
-    dateTo: input.dateTo,
-    radiusKm: input.radiusKm
-  };
-}
-
 function catalogIntent(
   request: OfficialSearchRequest,
   now: Date
 ): ResolvedSearchIntent {
-  const source = request.source || 'aol';
+  const source = request.source;
   const mode = source === 'aol' ? request.mode || 'in_person' : 'in_person';
   const intent: ResolvedSearchIntent = applySearchControls(
     {

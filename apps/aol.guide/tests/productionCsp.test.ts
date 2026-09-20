@@ -21,7 +21,7 @@ function header(name: string): string {
 describe('production Mapbox CSP', () => {
   const csp = header('Content-Security-Policy');
 
-  it('lets the Search Box call Mapbox without loading a third-party script', () => {
+  it('lets Temporary Geocoding call Mapbox without loading a third-party script', () => {
     expect(csp).toContain("connect-src 'self' https://api.mapbox.com https://events.mapbox.com");
     expect(csp).toContain('worker-src blob:');
     expect(csp).toContain('blob:');
