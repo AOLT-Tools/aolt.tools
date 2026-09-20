@@ -67,7 +67,7 @@ describe('browser Mapbox retrieve parsing', () => {
 describe('temporary location suggest', () => {
   it('waits 300ms and ignores queries shorter than 3 characters', async () => {
     const fetchImpl = vi.fn() as typeof fetch;
-    expect(LOCATION_SUGGEST_DEBOUNCE_MS).toBe(300);
+    expect(LOCATION_SUGGEST_DEBOUNCE_MS).toBe(500);
     expect(LOCATION_SUGGEST_MIN_CHARS).toBe(3);
     expect(shouldSuggestLocationQuery('MS')).toBe(false);
     expect(shouldSuggestLocationQuery('MSR')).toBe(true);

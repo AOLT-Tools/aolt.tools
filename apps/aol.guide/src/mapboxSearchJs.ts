@@ -3,7 +3,7 @@ import {
   parseMapboxTemporaryForwardSuggestions
 } from '@aolt/integrations/mapbox/geocode';
 
-export const LOCATION_SUGGEST_DEBOUNCE_MS = 300;
+export const LOCATION_SUGGEST_DEBOUNCE_MS = 500;
 export const LOCATION_SUGGEST_MIN_CHARS = 3;
 
 export type MapboxSearchBoxElement = HTMLElement & {
