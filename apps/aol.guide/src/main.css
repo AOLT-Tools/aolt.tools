@@ -83,17 +83,15 @@
     @apply relative min-w-0 flex-1;
   }
 
-  .location-input-row {
-    @apply flex min-w-0 items-center gap-1;
-  }
-
-  .location-clear {
-    @apply mr-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-base leading-none text-slate-500;
-  }
-
   .filter-input,
   .filter-select {
     @apply h-8 w-full min-w-0 border-0 bg-transparent pr-2 text-[13px] text-slate-900 outline-none;
+  }
+
+  .filter-input[type='search']::-webkit-search-decoration,
+  .filter-input[type='search']::-webkit-search-results-button,
+  .filter-input[type='search']::-webkit-search-results-decoration {
+    display: none;
   }
 
   .filter-select {
@@ -154,20 +152,7 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239a3412' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
 
-  .filter-control-body mapbox-search-box {
-    display: block;
-    width: 100%;
-    min-width: 0;
-    position: relative;
-    z-index: 30;
-    outline: none;
-    box-shadow: none;
-  }
-
-  .filter-control:focus-within,
-  .filter-control-body mapbox-search-box:focus,
-  .filter-control-body mapbox-search-box:focus-visible,
-  .filter-control-body mapbox-search-box:focus-within {
+  .filter-control:focus-within {
     outline: none;
     box-shadow: none;
   }

@@ -988,8 +988,6 @@ async function mountLocationSearch() {
   if (!locationHost) return;
   const token = (import.meta.env.AOL_GUIDE_MAPBOX_TOKEN || '').trim();
   const input = locationHost.querySelector<HTMLInputElement>('#location-input');
-  const clearButton =
-    locationHost.querySelector<HTMLButtonElement>('#location-clear');
   const suggestionList = locationHost.querySelector<HTMLElement>(
     '#location-suggestions'
   );
@@ -1010,17 +1008,11 @@ async function mountLocationSearch() {
     highlightIndex = -1;
   };
 
-  const syncClearButton = () => {
-    if (!clearButton) return;
-    clearButton.hidden = !input.value.trim();
-  };
-
   const clearLocation = () => {
     suggestAbort?.abort();
     window.clearTimeout(debounceTimer);
     selectedLocation = undefined;
     input.value = '';
-    syncClearButton();
     hideSuggestions();
     searchAbort?.abort();
     searchRequestId += 1;
@@ -1033,7 +1025,6 @@ async function mountLocationSearch() {
     window.clearTimeout(debounceTimer);
     selectedLocation = location;
     input.value = location.label;
-    syncClearButton();
     hideSuggestions();
     resetListings();
     void runCatalogSearch();
@@ -1087,7 +1078,6 @@ async function mountLocationSearch() {
 
   input.addEventListener('input', () => {
     const query = input.value;
-    syncClearButton();
     if (!query.trim()) {
       clearLocation();
       return;
@@ -1139,9 +1129,8 @@ async function mountLocationSearch() {
     window.setTimeout(hideSuggestions, 120);
   });
 
-  clearButton?.addEventListener('click', () => {
-    clearLocation();
-    input.focus();
+  input.addEventListener('search', () => {
+    if (!input.value.trim()) clearLocation();
   });
 
   document.addEventListener('click', (event) => {
@@ -1150,8 +1139,6 @@ async function mountLocationSearch() {
     }
     hideSuggestions();
   });
-
-  syncClearButton();
 }
 
 function searchLocationCoords(location: BrowserLocation | undefined) {
