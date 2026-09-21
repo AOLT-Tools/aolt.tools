@@ -133,41 +133,91 @@
             </div>
           </div>
 
+          <div class="program-control" id="program-control" hidden>
+            <button
+              type="button"
+              class="filter-control compact-select-control"
+              id="program-range-control"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="program-dialog"
+            >
+              <span class="filter-icon" aria-hidden="true">🧘</span>
+              <span class="compact-select-label" id="program-range-label">Program</span>
+            </button>
+          </div>
+
           <div class="time-control" id="time-control" hidden>
             <button
               type="button"
-              class="filter-control time-range-control"
+              class="filter-control compact-select-control"
               id="time-range-control"
+              aria-haspopup="dialog"
               aria-expanded="false"
-              aria-controls="time-custom-panel"
+              aria-controls="time-range-dialog"
             >
               <span class="filter-icon" aria-hidden="true">📅</span>
-              <span class="time-range-label" id="time-range-label">Anytime</span>
+              <span class="compact-select-label" id="time-range-label">7 days</span>
             </button>
-            <label class="sr-only" for="time-shortcut">Date shortcuts</label>
-            <select id="time-shortcut" class="time-shortcut">
-              <option value="" disabled>Range</option>
-              <option value="anytime">Anytime</option>
-              <option value="today">Today</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="this_weekend">Weekend</option>
-              <option value="next_7_days">7 days</option>
-              <option value="custom">Custom</option>
-            </select>
           </div>
         </div>
 
-        <div class="time-custom-panel" id="time-custom-panel" hidden>
-          <label class="time-custom-field" for="date-from">
-            <span>From</span>
-            <input id="date-from" class="date-input" type="date" />
-          </label>
-          <span class="date-sep" aria-hidden="true">–</span>
-          <label class="time-custom-field" for="date-to">
-            <span>To</span>
-            <input id="date-to" class="date-input" type="date" />
-          </label>
-        </div>
+        <dialog class="picker-dialog" id="program-dialog">
+          <form method="dialog" class="picker-dialog-card">
+            <p class="picker-dialog-title" id="program-dialog-title">Program</p>
+            <div
+              class="program-options"
+              id="program-options"
+              role="listbox"
+              aria-labelledby="program-dialog-title"
+            ></div>
+          </form>
+        </dialog>
+
+        <dialog class="picker-dialog" id="time-range-dialog">
+          <form method="dialog" class="picker-dialog-card">
+            <p class="picker-dialog-title" id="time-range-dialog-title">
+              Date range
+            </p>
+            <div
+              class="time-range-presets"
+              id="time-range-presets"
+              role="listbox"
+              aria-labelledby="time-range-dialog-title"
+            >
+              <button type="button" class="time-range-preset" role="option" data-preset="anytime">
+                Anytime
+              </button>
+              <button type="button" class="time-range-preset" role="option" data-preset="today">
+                Today
+              </button>
+              <button type="button" class="time-range-preset" role="option" data-preset="tomorrow">
+                Tomorrow
+              </button>
+              <button type="button" class="time-range-preset" role="option" data-preset="this_weekend">
+                Weekend
+              </button>
+              <button type="button" class="time-range-preset" role="option" data-preset="next_7_days">
+                7 days
+              </button>
+              <button type="button" class="time-range-preset" role="option" data-preset="custom">
+                Custom
+              </button>
+            </div>
+            <div class="time-custom-panel" id="time-custom-panel" hidden>
+              <label class="time-custom-field" for="date-from">
+                <span>From</span>
+                <input id="date-from" class="date-input" type="date" />
+              </label>
+              <span class="date-sep" aria-hidden="true">–</span>
+              <label class="time-custom-field" for="date-to">
+                <span>To</span>
+                <input id="date-to" class="date-input" type="date" />
+              </label>
+            </div>
+            <button type="submit" class="picker-dialog-done" value="done">Done</button>
+          </form>
+        </dialog>
 
         <div
           class="category-chips"

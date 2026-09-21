@@ -9,6 +9,13 @@ import {
   serializeCourseCategories,
   type CourseCategoryId
 } from '../lib/courseCategories.js';
+import {
+  ONLINE_PROGRAMS,
+  onlineProgramLabel,
+  onlineProgramShortLabel,
+  parseOnlineProgramId,
+  type OnlineProgramId
+} from '../lib/onlinePrograms.js';
 import { vvmvpCategoryLabel } from '../lib/sources/vvmvpListings.js';
 import {
   addCalendarDays,
@@ -52,6 +59,7 @@ const MODE_STORAGE_KEY = 'aol-guide-search-mode';
 const TIME_STORAGE_KEY = 'aol-guide-online-time';
 const TIME_FROM_STORAGE_KEY = 'aol-guide-online-date-from';
 const TIME_TO_STORAGE_KEY = 'aol-guide-online-date-to';
+const PROGRAM_STORAGE_KEY = 'aol-guide-online-program';
 const SHORT_MONTHS = [
   'Jan',
   'Feb',
@@ -77,10 +85,16 @@ const sourceToggle = document.querySelector<HTMLElement>('#search-source');
 const modeToggle = document.querySelector<HTMLElement>('#search-mode');
 const locationControl = document.querySelector<HTMLElement>('#location-control');
 const locationHost = document.querySelector<HTMLElement>('#location-host');
+const programControl = document.querySelector<HTMLElement>('#program-control');
+const programRangeControl = document.querySelector<HTMLButtonElement>('#program-range-control');
+const programRangeLabel = document.querySelector<HTMLElement>('#program-range-label');
+const programDialog = document.querySelector<HTMLDialogElement>('#program-dialog');
+const programOptions = document.querySelector<HTMLElement>('#program-options');
 const timeControl = document.querySelector<HTMLElement>('#time-control');
 const timeRangeControl = document.querySelector<HTMLButtonElement>('#time-range-control');
 const timeRangeLabel = document.querySelector<HTMLElement>('#time-range-label');
-const timeShortcut = document.querySelector<HTMLSelectElement>('#time-shortcut');
+const timeRangeDialog = document.querySelector<HTMLDialogElement>('#time-range-dialog');
+const timeRangePresets = document.querySelector<HTMLElement>('#time-range-presets');
 const timeCustomPanel = document.querySelector<HTMLElement>('#time-custom-panel');
 const dateFromInput = document.querySelector<HTMLInputElement>('#date-from');
 const dateToInput = document.querySelector<HTMLInputElement>('#date-to');
@@ -91,6 +105,7 @@ let currentMode: SearchMode = readStoredMode();
 let currentTimePreset: TimePreset = readStoredTime();
 let customDateFrom = readStoredIsoDate(TIME_FROM_STORAGE_KEY);
 let customDateTo = readStoredIsoDate(TIME_TO_STORAGE_KEY);
+let selectedOnlineProgram = readStoredProgram();
 let selectedCategories = new Set<CourseCategoryId>(readStoredCategories());
 let selectedAshramCategory = readStoredAshramCategory();
 let ashramCategories: string[] = [];
@@ -100,8 +115,6 @@ let mergedListings: OfficialCourseListing[] = [];
 let officialUrl = '';
 let searchRequestId = 0;
 let searchAbort: AbortController | null = null;
-let timeCustomOpen = false;
-let onlineRangeSelected = false;
 
 initializeSearchPage();
 
@@ -111,6 +124,7 @@ function initializeSearchPage() {
   setStatus('');
   renderSourceToggle();
   renderModeToggle();
+  renderProgramSelect();
   syncControls();
   renderCategoryChips();
   renderTimeControls();
@@ -140,24 +154,63 @@ function initializeSearchPage() {
     currentMode = mode;
     persistMode(mode);
     resetListings();
-    if (currentMode === 'online') onlineRangeSelected = false;
     renderModeToggle();
     syncControls();
-    if (usesOnlineSearch() && !onlineRangeSelected) {
+    if (usesOnlineSearch() && !selectedOnlineProgram) {
       showOnlineIdle();
       return;
     }
     void runCatalogSearch();
   });
 
-  timeShortcut?.addEventListener('change', () => {
-    const preset = parseTimePreset(timeShortcut.value);
+  programRangeControl?.addEventListener('click', () => {
+    openProgramDialog();
+  });
+
+  programOptions?.addEventListener('click', (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest('[data-program]') : null;
+    const program =
+      button instanceof HTMLElement
+        ? parseOnlineProgramId(button.dataset.program)
+        : undefined;
+    if (!program) return;
+    selectedOnlineProgram = program;
+    persistProgram(program);
+    renderProgramSelect();
+    closeProgramDialog();
+    resetListings();
+    void runCatalogSearch();
+  });
+
+  programDialog?.addEventListener('click', (event) => {
+    if (event.target === programDialog) closeProgramDialog();
+  });
+
+  programDialog?.addEventListener('close', () => {
+    renderProgramSelect();
+  });
+
+  timeRangePresets?.addEventListener('click', (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest('[data-preset]') : null;
+    const preset =
+      button instanceof HTMLElement ? parseTimePreset(button.dataset.preset) : undefined;
     if (!preset) return;
     applyTimeShortcut(preset);
+    if (preset !== 'custom') closeTimeRangeDialog();
   });
 
   timeRangeControl?.addEventListener('click', () => {
-    toggleCustomEditor();
+    openTimeRangeDialog();
+  });
+
+  timeRangeDialog?.addEventListener('click', (event) => {
+    if (event.target === timeRangeDialog) closeTimeRangeDialog();
+  });
+
+  timeRangeDialog?.addEventListener('close', () => {
+    renderTimeControls();
   });
 
   dateFromInput?.addEventListener('change', () => {
@@ -196,10 +249,15 @@ function syncControls() {
   const online = usesOnlineSearch();
   if (modeToggle) modeToggle.hidden = !courses;
   if (locationControl) locationControl.hidden = !inPerson;
+  if (programControl) programControl.hidden = !online;
   if (timeControl) timeControl.hidden = !online;
-  if (!online) timeCustomOpen = false;
+  if (!online) {
+    closeTimeRangeDialog();
+    closeProgramDialog();
+  }
   const filterSlot = document.querySelector<HTMLElement>('#filter-slot');
   if (filterSlot) filterSlot.hidden = !inPerson;
+  renderProgramSelect();
   renderTimeControls();
   if (categoryChips && currentSource !== 'aol' && currentSource !== 'vvmvp') {
     categoryChips.hidden = true;
@@ -226,7 +284,7 @@ function renderIdleState() {
     showLocationIdle();
     return;
   }
-  if (usesOnlineSearch() && !onlineRangeSelected) {
+  if (usesOnlineSearch() && !selectedOnlineProgram) {
     showOnlineIdle();
     return;
   }
@@ -250,7 +308,7 @@ function showOnlineIdle() {
     categoryChips.hidden = true;
     categoryChips.replaceChildren();
   }
-  results?.replaceChildren(emptyNode('Pick a date range to see programs.'));
+  results?.replaceChildren(emptyNode('Pick a program to see listings.'));
 }
 
 async function runCatalogSearch(options: { append?: boolean } = {}) {
@@ -259,7 +317,7 @@ async function runCatalogSearch(options: { append?: boolean } = {}) {
     showLocationIdle();
     return;
   }
-  if (usesOnlineSearch() && !onlineRangeSelected) {
+  if (usesOnlineSearch() && !selectedOnlineProgram) {
     showOnlineIdle();
     return;
   }
@@ -333,6 +391,7 @@ async function fetchCatalog(
     body: JSON.stringify({
       source: currentSource,
       mode: currentSource === 'aol' ? currentMode : undefined,
+      courseCode: usesOnlineSearch() ? selectedOnlineProgram : undefined,
       datePreset:
         currentSource === 'aol' && currentMode === 'online'
           ? currentTimePreset
@@ -412,7 +471,7 @@ function visibleListings(): OfficialCourseListing[] {
       (item) => ashramCategory(item) === selectedAshramCategory
     );
   }
-  if (currentSource === 'center') return mergedListings;
+  if (currentSource === 'center' || usesOnlineSearch()) return mergedListings;
   if (!selectedCategories.size) return [];
   return mergedListings.filter((item) => selectedCategories.has(listingCategory(item)));
 }
@@ -458,6 +517,11 @@ function pruneAshramCategory() {
 
 function renderCategoryChips() {
   if (!categoryChips) return;
+  if (usesOnlineSearch()) {
+    categoryChips.hidden = true;
+    categoryChips.replaceChildren();
+    return;
+  }
   if (currentSource === 'vvmvp') {
     pruneAshramCategory();
     if (!ashramCategories.length) {
@@ -593,6 +657,9 @@ function selectedCategoryLabel(): string {
       : 'Programs';
   }
   if (currentSource === 'center') return 'Follow-up & Satsang';
+  if (usesOnlineSearch() && selectedOnlineProgram) {
+    return onlineProgramLabel(selectedOnlineProgram);
+  }
   const selected = COURSE_CATEGORY_ORDER.find((id) => selectedCategories.has(id));
   return selected ? courseCategoryLabel(selected) : 'Programs';
 }
@@ -675,7 +742,7 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const title = document.createElement('h2');
   title.textContent = item.title;
   heading.append(title);
-  if (online) {
+  if (online && !usesOnlineSearch()) {
     const labels = document.createElement('div');
     labels.className = 'result-card-labels';
     const badge = document.createElement('span');
@@ -797,6 +864,41 @@ function renderModeToggle() {
   });
 }
 
+function renderProgramSelect() {
+  if (!programOptions) return;
+  if (!programOptions.childElementCount) {
+    for (const program of ONLINE_PROGRAMS) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'program-option';
+      button.dataset.program = program.id;
+      button.setAttribute('role', 'option');
+      button.textContent = program.label;
+      programOptions.append(button);
+    }
+  }
+  programOptions.querySelectorAll<HTMLButtonElement>('[data-program]').forEach((button) => {
+    button.setAttribute(
+      'aria-selected',
+      String(button.dataset.program === selectedOnlineProgram)
+    );
+  });
+  if (programRangeLabel) {
+    programRangeLabel.textContent = selectedOnlineProgram
+      ? onlineProgramShortLabel(selectedOnlineProgram)
+      : 'Program';
+  }
+  if (programRangeControl) {
+    programRangeControl.setAttribute(
+      'aria-label',
+      selectedOnlineProgram
+        ? onlineProgramLabel(selectedOnlineProgram)
+        : 'Program'
+    );
+    programRangeControl.setAttribute('aria-expanded', String(Boolean(programDialog?.open)));
+  }
+}
+
 function renderTimeControls() {
   if (currentTimePreset !== 'anytime' && currentTimePreset !== 'custom') {
     applyPresetDates(currentTimePreset);
@@ -804,17 +906,22 @@ function renderTimeControls() {
     ensureCustomDates();
   }
   const anytime = currentTimePreset === 'anytime';
-  const showCustom = Boolean(timeCustomOpen && timeControl && !timeControl.hidden);
-  if (timeShortcut) timeShortcut.value = onlineRangeSelected ? currentTimePreset : '';
+  const dialogOpen = Boolean(timeRangeDialog?.open);
+  const showCustom = currentTimePreset === 'custom';
   if (timeRangeLabel) {
-    timeRangeLabel.textContent =
-      !onlineRangeSelected || anytime
-        ? 'Anytime'
-        : formatCompactDateRange(customDateFrom, customDateTo);
+    timeRangeLabel.textContent = anytime
+      ? 'Anytime'
+      : formatCompactDateRange(customDateFrom, customDateTo);
   }
   if (timeRangeControl) {
-    timeRangeControl.setAttribute('aria-expanded', String(showCustom));
+    timeRangeControl.setAttribute('aria-expanded', String(dialogOpen));
   }
+  timeRangePresets?.querySelectorAll<HTMLButtonElement>('[data-preset]').forEach((button) => {
+    button.setAttribute(
+      'aria-selected',
+      String(button.dataset.preset === currentTimePreset)
+    );
+  });
   if (timeCustomPanel) timeCustomPanel.hidden = !showCustom;
   const today = todayInIndia();
   const max = addCalendarDays(today, 365);
@@ -833,8 +940,6 @@ function renderTimeControls() {
 function applyTimeShortcut(preset: TimePreset) {
   currentTimePreset = preset;
   persistTime(preset);
-  onlineRangeSelected = true;
-  timeCustomOpen = preset === 'custom';
   if (preset === 'anytime') {
     customDateFrom = '';
     customDateTo = '';
@@ -850,22 +955,32 @@ function applyTimeShortcut(preset: TimePreset) {
   void runCatalogSearch();
 }
 
-function toggleCustomEditor() {
-  if (timeCustomOpen) {
-    timeCustomOpen = false;
-    renderTimeControls();
-    return;
-  }
-  timeCustomOpen = true;
-  if (currentTimePreset === 'anytime') {
-    applyTimeShortcut('custom');
-    return;
-  }
-  if (currentTimePreset !== 'custom') {
-    currentTimePreset = 'custom';
-    persistTime('custom');
+function openTimeRangeDialog() {
+  if (!timeRangeDialog || timeControl?.hidden) return;
+  closeProgramDialog();
+  if (typeof timeRangeDialog.showModal === 'function' && !timeRangeDialog.open) {
+    timeRangeDialog.showModal();
   }
   renderTimeControls();
+}
+
+function closeTimeRangeDialog() {
+  if (timeRangeDialog?.open) timeRangeDialog.close();
+  renderTimeControls();
+}
+
+function openProgramDialog() {
+  if (!programDialog || programControl?.hidden) return;
+  closeTimeRangeDialog();
+  if (typeof programDialog.showModal === 'function' && !programDialog.open) {
+    programDialog.showModal();
+  }
+  renderProgramSelect();
+}
+
+function closeProgramDialog() {
+  if (programDialog?.open) programDialog.close();
+  renderProgramSelect();
 }
 
 function formatCompactDateRange(from: string, to: string): string {
@@ -916,7 +1031,6 @@ function onDateInputsChanged() {
     customDateTo = customDateFrom;
   }
   persistCustomDates();
-  onlineRangeSelected = true;
   currentTimePreset = presetMatchingDates(customDateFrom, customDateTo);
   persistTime(currentTimePreset);
   renderTimeControls();
@@ -1184,9 +1298,9 @@ function persistMode(mode: SearchMode) {
 
 function readStoredTime(): TimePreset {
   try {
-    return parseTimePreset(localStorage.getItem(TIME_STORAGE_KEY) || '') || 'anytime';
+    return parseTimePreset(localStorage.getItem(TIME_STORAGE_KEY) || '') || 'next_7_days';
   } catch {
-    return 'anytime';
+    return 'next_7_days';
   }
 }
 
@@ -1212,6 +1326,23 @@ function persistCustomDates() {
     if (customDateTo) localStorage.setItem(TIME_TO_STORAGE_KEY, customDateTo);
   } catch {
     // Ignore storage failures; the selected custom dates still apply for this visit.
+  }
+}
+
+function readStoredProgram(): OnlineProgramId | undefined {
+  try {
+    return parseOnlineProgramId(localStorage.getItem(PROGRAM_STORAGE_KEY) || '');
+  } catch {
+    return undefined;
+  }
+}
+
+function persistProgram(program: OnlineProgramId | undefined) {
+  try {
+    if (program) localStorage.setItem(PROGRAM_STORAGE_KEY, program);
+    else localStorage.removeItem(PROGRAM_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures; the selected program still applies for this visit.
   }
 }
 

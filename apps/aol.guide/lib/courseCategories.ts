@@ -39,12 +39,16 @@ const SATSANG_TITLE = /\bsatsangs?\b/i;
 
 const CATEGORY_BY_CODE: Record<string, CourseCategoryId> = {
   HP: 'beginner',
+  OMBW: 'beginner',
   MEDHA: 'kids',
   UTKARSHA: 'kids',
   IP2: 'kids',
   IP: 'other',
   SSY: 'yoga',
+  SSY_DEEP_DIVE: 'yoga',
   SSDY: 'beginner',
+  SPEED_READING: 'other',
+  DEEP_SLEEP: 'other',
   AMP: 'advanced',
   DSN: 'advanced',
   SANYAM: 'advanced',

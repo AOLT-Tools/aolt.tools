@@ -210,6 +210,53 @@ describe('official search service', () => {
     expect(requested[0]).toContain('start_date_to=2026-09-04');
   });
 
+  it('filters online search by the selected program type', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      now,
+      fetchImpl: aolListingsFetchMock(
+        [sampleAolCourse({ is_online_event: 1, dist: undefined, ctype: '814381' })],
+        1,
+        requested
+      )
+    });
+    const result = await service.search({
+      source: 'aol',
+      mode: 'online',
+      courseCode: 'AMP',
+      datePreset: 'next_7_days'
+    });
+    expect(result.intent.courseCode).toBe('AMP');
+    expect(result.intent.courseLabel).toBe('Advanced Meditation Program');
+    expect(result.intent.courseTypeIds).toContain('814381');
+    expect(result.intent.dateFrom).toBe('2026-09-04');
+    expect(result.intent.dateTo).toBe('2026-09-10');
+    expect(requested[0]).toContain('is_online_event=1');
+    expect(requested[0]).toContain('ctype=');
+    expect(requested[0]).toContain('814381');
+  });
+
+  it('uses OMBW type ids instead of the full Happiness Program set', async () => {
+    const requested: string[] = [];
+    const service = new OfficialSearchService({
+      now,
+      fetchImpl: aolListingsFetchMock(
+        [sampleAolCourse({ is_online_event: 1, dist: undefined, ctype: '338000' })],
+        1,
+        requested
+      )
+    });
+    const result = await service.search({
+      source: 'aol',
+      mode: 'online',
+      courseCode: 'OMBW',
+      datePreset: 'next_7_days'
+    });
+    expect(result.intent.courseTypeIds).toEqual(['338000', '337993']);
+    expect(requested[0]).toContain('ctype=338000%2C337993');
+    expect(requested[0]).not.toContain('74889');
+  });
+
   it('loads live Bangalore Ashram listings for the Ashram catalogue', async () => {
     const requested: string[] = [];
     const service = createService((async (input: Parameters<typeof fetch>[0]) => {

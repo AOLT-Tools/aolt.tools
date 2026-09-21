@@ -1,4 +1,5 @@
 import { parseIsoDate, type OnlineTimePreset } from './dateRanges.js';
+import { parseOnlineProgramId } from './onlinePrograms.js';
 import type {
   SearchMode,
   SelectedSearchLocation
@@ -35,7 +36,7 @@ export function parseDatePreset(value: unknown): OnlineTimePreset | undefined {
     : undefined;
 }
 
-export { parseIsoDate };
+export { parseIsoDate, parseOnlineProgramId };
 
 export function readLocation(value: unknown): SelectedSearchLocation | undefined {
   if (!value || typeof value !== 'object') return undefined;

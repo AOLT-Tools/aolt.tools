@@ -7,12 +7,17 @@ import {
   parseSearchSource,
   parseRadiusKm,
   parseIsoDate,
+  parseOnlineProgramId,
   readLocation
 } from '../lib/searchRequest.js';
+import { ONLINE_PROGRAM_IDS, type OnlineProgramId } from '../lib/onlinePrograms.js';
 
 const SearchBodySchema = z.object({
   source: z.enum(['aol', 'center', 'vvmvp', 'vds']),
   mode: z.enum(['in_person', 'online']).optional(),
+  courseCode: z
+    .enum(ONLINE_PROGRAM_IDS as unknown as [OnlineProgramId, ...OnlineProgramId[]])
+    .optional(),
   datePreset: z
     .enum(['anytime', 'today', 'tomorrow', 'this_weekend', 'next_7_days', 'custom'])
     .optional(),
@@ -50,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await createOfficialSearchService().search({
       source,
       mode: parseSearchMode(body.mode),
+      courseCode: parseOnlineProgramId(body.courseCode),
       datePreset: parseDatePreset(body.datePreset),
       dateFrom: parseIsoDate(body.dateFrom),
       dateTo: parseIsoDate(body.dateTo),

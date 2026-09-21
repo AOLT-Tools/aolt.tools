@@ -86,6 +86,7 @@ function attachSearchApi(server: {
         parseSearchSource,
         parseRadiusKm,
         parseIsoDate,
+        parseOnlineProgramId,
         readLocation
       } = await import('./lib/searchRequest.ts');
       const source = parseSearchSource(body.source);
@@ -100,6 +101,7 @@ function attachSearchApi(server: {
       const result = await createOfficialSearchService().search({
         source,
         mode: parseSearchMode(body.mode),
+        courseCode: parseOnlineProgramId(body.courseCode),
         datePreset: parseDatePreset(body.datePreset),
         dateFrom: parseIsoDate(body.dateFrom),
         dateTo: parseIsoDate(body.dateTo),

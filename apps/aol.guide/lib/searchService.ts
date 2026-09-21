@@ -5,6 +5,12 @@ import {
   resolveOnlineTimePreset,
   type OnlineTimePreset
 } from './dateRanges.js';
+import {
+  onlineProgramLabel,
+  onlineProgramTypeIds,
+  parseOnlineProgramId,
+  type OnlineProgramId
+} from './onlinePrograms.js';
 import type {
   OfficialCourseListing,
   ResolvedSearchIntent,
@@ -32,6 +38,7 @@ export type OfficialSearchRequest = {
   source: SearchSourceId;
   mode?: SearchMode;
   location?: SelectedSearchLocation;
+  courseCode?: OnlineProgramId;
   datePreset?: OnlineTimePreset;
   dateFrom?: string;
   dateTo?: string;
@@ -247,12 +254,16 @@ export function applySearchControls(
     const unfiltered =
       request.datePreset === 'anytime' ||
       (request.datePreset === 'custom' && !custom);
+    const program = parseOnlineProgramId(request.courseCode);
     return {
       ...intent,
       deliveryMode: 'online',
       latitude: undefined,
       longitude: undefined,
       radiusKm: undefined,
+      courseCode: program,
+      courseLabel: program ? onlineProgramLabel(program) : undefined,
+      courseTypeIds: program ? onlineProgramTypeIds(program) : [],
       dateFrom: unfiltered ? undefined : range?.start || intent.dateFrom,
       dateTo: unfiltered ? undefined : range?.end || intent.dateTo,
       dateLabel: unfiltered ? undefined : range?.label || intent.dateLabel

@@ -34,11 +34,15 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
       'happiness',
       'happiness program',
       'rural happiness',
-      'online meditation and breath workshop',
       'meditation and breath workshop',
-      'breath workshop',
-      'ombw'
+      'breath workshop'
     ]
+  },
+  {
+    code: 'OMBW',
+    label: 'Online Meditation and Breath Workshop',
+    typeIds: ['338000', '337993'],
+    keywords: ['ombw', 'online meditation and breath workshop']
   },
   {
     code: 'AMP',
@@ -109,8 +113,14 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'SSY',
     label: 'Sri Sri Yoga',
-    typeIds: ['337981', '368348', '532059'],
+    typeIds: ['337981', '532059'],
     keywords: ['ssy', 'sri sri yoga', 'yoga', 'online yoga', 'yoga classes']
+  },
+  {
+    code: 'SSY_DEEP_DIVE',
+    label: 'Sri Sri Yoga Deep Dive',
+    typeIds: ['368348'],
+    keywords: ['deep dive', 'sri sri yoga deep dive', 'ssy deep dive']
   },
   {
     code: 'SSDY',
@@ -147,6 +157,18 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
     label: 'Follow Up',
     typeIds: [...FOLLOW_UP_COURSE_TYPE_IDS],
     keywords: ['follow up', 'followup', 'kriya follow up', 'kriya followup']
+  },
+  {
+    code: 'SPEED_READING',
+    label: '10x Speed Reading Program',
+    typeIds: ['1677263'],
+    keywords: ['10x', 'speed reading', '10x speed reading']
+  },
+  {
+    code: 'DEEP_SLEEP',
+    label: 'Deep Sleep and Anxiety Relief',
+    typeIds: ['346148'],
+    keywords: ['deep sleep', 'anxiety relief', 'deep sleep and anxiety']
   }
 ];
 
