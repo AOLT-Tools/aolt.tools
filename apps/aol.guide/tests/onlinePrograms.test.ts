@@ -45,14 +45,20 @@ describe('online program catalog', () => {
       expect.arrayContaining(['814381', '22119'])
     );
     expect(onlineProgramTypeIds('OMBW')).toEqual(['338000', '337993']);
-    expect(onlineProgramTypeIds('SSY')).toEqual(['337981', '532059']);
+    expect(onlineProgramTypeIds('SSY')).toEqual(
+      expect.arrayContaining(['337981', '532059', '12410'])
+    );
     expect(onlineProgramTypeIds('SSY')).not.toContain('368348');
-    expect(onlineProgramTypeIds('SSY_DEEP_DIVE')).toEqual(['368348']);
+    expect(onlineProgramTypeIds('SSY_DEEP_DIVE')).toEqual(
+      expect.arrayContaining(['368348', '55113', '337995'])
+    );
     expect(onlineProgramTypeIds('SSDY')).toEqual(
       expect.arrayContaining(['339715'])
     );
     expect(onlineProgramTypeIds('SPEED_READING')).toEqual(['1677263']);
-    expect(onlineProgramTypeIds('DEEP_SLEEP')).toEqual(['346148']);
+    expect(onlineProgramTypeIds('DEEP_SLEEP')).toEqual(
+      expect.arrayContaining(['346148', '1488895'])
+    );
     expect(findCourseAliasByCode('DEEP_SLEEP')?.label).toBe(
       'Deep Sleep and Anxiety Relief'
     );

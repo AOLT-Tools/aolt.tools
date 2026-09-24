@@ -29,9 +29,9 @@ Empty values are omitted from the hash. In particular `is_online_event` is only 
 
 `course_language` uses the official ISO codes (`hi`, not `Hindi`).
 
-`ctype` is split on commas and matched against official course-type values. AOL Guide reuses existing course alias type IDs (for example HP `313040`) and does not guess new IDs.
+`ctype` is split on commas and matched against official course-type values. AOL Guide keeps the course-type ids from the official program filters in `courseAliases.ts`. Programs without their own chip are categorized as Other.
 
-Live listings: AOL Guide loads JSON from `https://www.artofliving.org/india-search-course-api` with the same filters plus `limit` and `offset` (offset is a 1-based page number). The API returns one page of 20 rows. An in-person catalog search therefore requests one page per course category, using that category's official course-type ids, and merges them. A single untyped page is filled by Happiness Program and Follow Up, which hides Intuition Process and other categories. Listings are not stored. `dist` in the payload is meters.
+Live listings: AOL Guide loads JSON from `https://www.artofliving.org/india-search-course-api` with the same filters plus `limit` and `offset` (offset is a 1-based page number). The API returns one page of 20 rows. An in-person catalog search therefore requests one page per program, using that program's official course-type ids, and merges them. Follow Up stays on the Center catalogue. Listings are not stored. `dist` in the payload is meters.
 
 The official location box accepts a place or PIN through Mapbox, then searches with `lat` / `lng`. There is no pincode query parameter on the listings API. AOL Guide uses Mapbox Temporary Geocoding (`permanent=false`) in the browser for place suggestions and sends those coordinates on the catalog request. Coordinates are used only for the current request and are not written to disk.
 

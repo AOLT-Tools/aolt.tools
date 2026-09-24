@@ -122,9 +122,8 @@ export class OfficialSearchService {
         fetchImpl: this.options.fetchImpl,
         limit: this.options.aolListingLimit
       };
-      // The listings API returns one page of 20. An untyped nearby search fills
-      // that page with Happiness Program and Follow Up, so Intuition Process and
-      // other categories never arrive. Ask for each category's course types.
+      // The listings API returns one page of 20. Ask for each program's course
+      // types so one program cannot fill that page and hide the others.
       const page =
         source.source === 'aol' &&
         intent.deliveryMode === 'in_person' &&

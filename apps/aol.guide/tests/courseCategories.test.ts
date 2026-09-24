@@ -93,11 +93,22 @@ describe('course categories', () => {
     ]);
   });
 
-  it('requests Intuition Process types with the kids catalog and leaves Follow Up out', () => {
+  it('requests every official program except Follow Up, and files the extra programs as Other', () => {
     const groups = inPersonCatalogTypeGroups();
-    const kids = groups.find((group) => group.includes('1495970'));
-    expect(kids).toEqual(expect.arrayContaining(['1495970', '384230', '602859']));
+    expect(groups.some((group) => group.includes('1495970'))).toBe(true);
+    expect(groups.some((group) => group.includes('384230'))).toBe(true);
+    expect(groups.some((group) => group.includes('368353'))).toBe(true);
+    expect(groups.some((group) => group.includes('555884'))).toBe(true);
     expect(groups.some((group) => group.includes('351956'))).toBe(false);
+    expect(categorizeCourse({ courseTypeId: '368353', title: 'Wellness Program' })).toBe(
+      'other'
+    );
+    expect(categorizeCourse({ courseTypeId: '1017197', title: 'Teachers Training Program' })).toBe(
+      'other'
+    );
+    expect(categorizeCourse({ courseTypeId: '555884', title: 'Sanyam 1' })).toBe(
+      'advanced'
+    );
   });
 
   it('expands the in-person radius ladder from 3 km', () => {

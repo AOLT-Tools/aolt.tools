@@ -65,7 +65,7 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'SANYAM',
     label: 'Sanyam',
-    typeIds: [],
+    typeIds: ['555884', '542084', '1158447', '514590'],
     keywords: ['sanyam', 'sanyam level 1', 'sanyam level one']
   },
   {
@@ -122,13 +122,22 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'SSY',
     label: 'Sri Sri Yoga',
-    typeIds: ['337981', '532059'],
+    typeIds: [
+      '337981',
+      '532059',
+      '12410',
+      '337971',
+      '68476',
+      '337987',
+      '384231',
+      '384224'
+    ],
     keywords: ['ssy', 'sri sri yoga', 'yoga', 'online yoga', 'yoga classes']
   },
   {
     code: 'SSY_DEEP_DIVE',
     label: 'Sri Sri Yoga Deep Dive',
-    typeIds: ['368348'],
+    typeIds: ['368348', '55113', '337995'],
     keywords: ['deep dive', 'sri sri yoga deep dive', 'ssy deep dive']
   },
   {
@@ -140,7 +149,7 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'DSN',
     label: 'DSN',
-    typeIds: ['12427'],
+    typeIds: ['12427', '56370', '56374', '557042'],
     keywords: ['dsn']
   },
   {
@@ -176,8 +185,62 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'DEEP_SLEEP',
     label: 'Deep Sleep and Anxiety Relief',
-    typeIds: ['346148'],
+    typeIds: ['346148', '1488895'],
     keywords: ['deep sleep', 'anxiety relief', 'deep sleep and anxiety']
+  },
+  {
+    code: 'WELLNESS',
+    label: 'Wellness Program',
+    typeIds: ['368353', '465639', '736104', '850578', '555883'],
+    keywords: ['wellness program']
+  },
+  {
+    code: 'YLTP',
+    label: 'YLTP',
+    typeIds: ['12396', '31672', '31669', '337977'],
+    keywords: ['yltp', 'karma yoga']
+  },
+  {
+    code: 'QUIT_TOBACCO',
+    label: 'Quit Tobacco Program',
+    typeIds: ['337959', '555887'],
+    keywords: ['quit tobacco']
+  },
+  {
+    code: 'SHAKTI',
+    label: 'Shakti Kriya',
+    typeIds: ['79943'],
+    keywords: ['shakti kriya']
+  },
+  {
+    code: 'BLESSINGS',
+    label: 'Blessing Course',
+    typeIds: ['12422'],
+    keywords: ['blessing course', 'blessings program']
+  },
+  {
+    code: 'TTP',
+    label: 'Teachers Training Program',
+    typeIds: ['1017197', '380278'],
+    keywords: ['teachers training program', 'teacher training program']
+  },
+  {
+    code: 'PARENTS',
+    label: 'For Parents',
+    typeIds: ['12385', '12384', '413102', '408853', '337973', '337974'],
+    keywords: ['know your child', 'know your teen', 'for parents']
+  },
+  {
+    code: 'SSY_KIDS',
+    label: 'Sri Sri Yoga Classes for Kids',
+    typeIds: ['68629', '337975'],
+    keywords: ['yoga classes for kids']
+  },
+  {
+    code: 'SANSKAR',
+    label: 'Sri Sri Sanskar Kendra',
+    typeIds: ['1373993', '476729', '1374004', '384219', '384220', '1374011'],
+    keywords: ['sanskar kendra']
   }
 ];
 

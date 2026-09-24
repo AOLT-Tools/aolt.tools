@@ -49,6 +49,15 @@ const CATEGORY_BY_CODE: Record<string, CourseCategoryId> = {
   SSDY: 'beginner',
   SPEED_READING: 'other',
   DEEP_SLEEP: 'other',
+  WELLNESS: 'other',
+  YLTP: 'other',
+  QUIT_TOBACCO: 'other',
+  SHAKTI: 'other',
+  BLESSINGS: 'other',
+  TTP: 'other',
+  PARENTS: 'other',
+  SSY_KIDS: 'other',
+  SANSKAR: 'other',
   AMP: 'advanced',
   DSN: 'advanced',
   SANYAM: 'advanced',
@@ -117,23 +126,10 @@ export function nextAolRadiusKm(currentKm: number): number | undefined {
   return AOL_RADIUS_LADDER_KM.find((radius) => radius > currentKm);
 }
 
-const KIDS_CATALOG_CODES = new Set(['IP', 'IP2', 'MEDHA', 'UTKARSHA']);
-
 export function inPersonCatalogTypeGroups(): string[][] {
-  const grouped = new Map<CourseCategoryId, Set<string>>();
-  for (const alias of COURSE_ALIASES) {
-    if (alias.code === 'FOLLOW_UP' || alias.typeIds.length === 0) continue;
-    const category = KIDS_CATALOG_CODES.has(alias.code)
-      ? 'kids'
-      : CATEGORY_BY_CODE[alias.code] || 'other';
-    if (category === 'regular_connects') continue;
-    const bucket = grouped.get(category) || new Set<string>();
-    for (const typeId of alias.typeIds) bucket.add(typeId);
-    grouped.set(category, bucket);
-  }
-  return COURSE_CATEGORY_ORDER.flatMap((category) => {
-    const ids = grouped.get(category);
-    return ids?.size ? [[...ids]] : [];
+  return COURSE_ALIASES.flatMap((alias) => {
+    if (alias.code === 'FOLLOW_UP' || alias.typeIds.length === 0) return [];
+    return [[...new Set(alias.typeIds)]];
   });
 }
 
