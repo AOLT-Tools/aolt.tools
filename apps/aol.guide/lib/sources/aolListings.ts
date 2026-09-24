@@ -160,6 +160,35 @@ export function normalizeAolListing(raw: unknown): OfficialCourseListing | null 
   };
 }
 
+export async function fetchAolListingsForTypeGroups(
+  filters: Record<string, string>,
+  typeGroups: readonly (readonly string[])[],
+  options: FetchAolListingsOptions = {}
+): Promise<AolListingPage> {
+  const groups = typeGroups.filter((group) => group.length > 0);
+  if (!groups.length) return fetchAolListingsForRadius(filters, options);
+
+  const pages = await Promise.all(
+    groups.map((typeIds) =>
+      fetchAolListingsForRadius(
+        { ...filters, ctype: typeIds.join(',') },
+        options
+      )
+    )
+  );
+  const byId = new Map<string, OfficialCourseListing>();
+  for (const page of pages) {
+    for (const listing of page.listings) {
+      const previous = byId.get(listing.id);
+      if (!previous || closerListing(listing, previous)) {
+        byId.set(listing.id, listing);
+      }
+    }
+  }
+  const listings = sortListingsByDistance([...byId.values()]);
+  return { listings, total: listings.length };
+}
+
 export async function fetchAolListingsForRadius(
   filters: Record<string, string>,
   options: FetchAolListingsOptions = {}

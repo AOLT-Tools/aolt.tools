@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev:aol.guide": "pnpm --dir apps/aol.guide dev",
+    "dev:aol.guide": "pnpm build:packages && pnpm --dir apps/aol.guide dev",
     "dev:seva.hub": "pnpm build:packages && pnpm --dir apps/seva.hub exec vercel dev",
     "build:packages": "pnpm --filter @aolt/shared build && pnpm --filter @aolt/core build && pnpm --filter @aolt/integrations build",
     "build:aol.guide": "pnpm --dir apps/aol.guide build",

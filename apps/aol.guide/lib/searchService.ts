@@ -1,5 +1,8 @@
 import { isValidLatitude, isValidLongitude } from '@aolt/core/geo';
-import { isRegularConnectListing } from './courseCategories.js';
+import {
+  inPersonCatalogTypeGroups,
+  isRegularConnectListing
+} from './courseCategories.js';
 import {
   resolveCustomDateRange,
   resolveOnlineTimePreset,
@@ -19,6 +22,7 @@ import type {
 } from './searchIntent.js';
 import {
   fetchAolListingsForRadius,
+  fetchAolListingsForTypeGroups,
   type AolListingPage
 } from './sources/aolListings.js';
 import { aolSearchAdapter, buildAolFilters } from './sources/aolSearchAdapter.js';
@@ -113,15 +117,25 @@ export class OfficialSearchService {
         source.listingTotal = 0;
         return;
       }
-      applyAolListingResult(
-        source,
-        intent,
-        await fetchAolListingsForRadius(buildAolFilters(intent, now), {
-          fetchImpl: this.options.fetchImpl,
-          limit: this.options.aolListingLimit
-        }),
-        now
-      );
+      const filters = buildAolFilters(intent, now);
+      const fetchOptions = {
+        fetchImpl: this.options.fetchImpl,
+        limit: this.options.aolListingLimit
+      };
+      // The listings API returns one page of 20. An untyped nearby search fills
+      // that page with Happiness Program and Follow Up, so Intuition Process and
+      // other categories never arrive. Ask for each category's course types.
+      const page =
+        source.source === 'aol' &&
+        intent.deliveryMode === 'in_person' &&
+        !(intent.courseTypeIds || []).length
+          ? await fetchAolListingsForTypeGroups(
+              filters,
+              inPersonCatalogTypeGroups(),
+              fetchOptions
+            )
+          : await fetchAolListingsForRadius(filters, fetchOptions);
+      applyAolListingResult(source, intent, page, now);
     } catch (error) {
       const detail =
         error instanceof Error ? error.message : 'Could not load Art of Living listings.';

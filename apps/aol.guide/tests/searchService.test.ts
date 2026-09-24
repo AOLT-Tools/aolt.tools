@@ -65,13 +65,14 @@ describe('official search service', () => {
     expect(result.intent.latitude).toBe(13.041018);
     expect(result.intent.longitude).toBe(77.621558);
     expect(result.intent.pincode).toBeUndefined();
-    expect(requested).toHaveLength(1);
-    expect(requested[0]).toContain('lat=13.041018');
-    expect(requested[0]).toContain('lng=77.621558');
-    expect(requested[0]).toContain('type=search');
-    expect(requested[0]).toContain('distance=3');
-    expect(requested[0]).not.toContain('ctype=');
-    expect(requested[0]).not.toContain('560077');
+    expect(requested.length).toBeGreaterThan(1);
+    expect(requested.every((url) => url.includes('lat=13.041018'))).toBe(true);
+    expect(requested.every((url) => url.includes('lng=77.621558'))).toBe(true);
+    expect(requested.every((url) => url.includes('type=search'))).toBe(true);
+    expect(requested.every((url) => url.includes('distance=3'))).toBe(true);
+    expect(requested.every((url) => url.includes('ctype='))).toBe(true);
+    expect(requested.some((url) => url.includes('1495970'))).toBe(true);
+    expect(requested.every((url) => !url.includes('560077'))).toBe(true);
     expect(result.sources[0]?.url).toContain('lat=13.041018');
     expect(result.sources[0]?.url).toContain('lng=77.621558');
     expect(result.sources[0]?.url).toContain('selectedLocName=Bengaluru');
@@ -82,6 +83,38 @@ describe('official search service', () => {
   it('parses the Center catalogue source', () => {
     expect(parseSearchSource('center')).toBe('center');
     expect(parseSearchSource('aol')).toBe('aol');
+  });
+
+  it('keeps Intuition Process listings that an untyped first page would omit', async () => {
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const course = url.includes('1495970')
+        ? sampleAolCourse({
+            title: 'IP Junior',
+            sao_id: 9001,
+            ctype: '1495970',
+            dist: 4100
+          })
+        : sampleAolCourse({ sao_id: 1050180, ctype: '74889', dist: 1000 });
+      return new Response(JSON.stringify({ courses: [course], total: 1 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    }) as typeof fetch;
+    const result = await new OfficialSearchService({ now, fetchImpl }).search({
+      source: 'aol',
+      mode: 'in_person',
+      radiusKm: 3,
+      location: {
+        label: 'Thanisandra Main Road, Bengaluru, 560077, India',
+        latitude: 13.04372089,
+        longitude: 77.6330614,
+        city: 'Bengaluru'
+      }
+    });
+    expect(result.sources[0]?.listings?.map((listing) => listing.title)).toEqual(
+      expect.arrayContaining(['Happiness Program (3 Days)', 'IP Junior'])
+    );
   });
 
   it('drops Follow-up and Satsang from the Courses catalogue', async () => {

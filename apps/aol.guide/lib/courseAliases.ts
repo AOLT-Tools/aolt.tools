@@ -71,7 +71,7 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'IP2',
     label: 'Intuition Process 2',
-    typeIds: [],
+    typeIds: ['384230'],
     keywords: ['ip2', 'ip 2', 'intuition process 2', 'intuition program 2']
   },
   {
@@ -98,7 +98,16 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
       '377474',
       '393338',
       '397683',
-      '409022'
+      '409022',
+      '1495943',
+      '1495944',
+      '692565',
+      '458422',
+      '368347',
+      '52621',
+      '817069',
+      '337996',
+      '384236'
     ],
     keywords: [
       'ip',
@@ -137,13 +146,13 @@ export const COURSE_ALIASES: readonly CourseAliasDefinition[] = [
   {
     code: 'MEDHA',
     label: 'Medha Yoga',
-    typeIds: ['622743'],
+    typeIds: ['622743', '65196', '817068'],
     keywords: ['medha', 'medha yoga']
   },
   {
     code: 'UTKARSHA',
     label: 'Utkarsha Yoga',
-    typeIds: ['602859'],
+    typeIds: ['602859', '817070', '12414'],
     keywords: ['utkarsha', 'utkarsha yoga']
   },
   {

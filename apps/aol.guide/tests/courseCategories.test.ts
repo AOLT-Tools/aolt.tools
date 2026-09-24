@@ -4,6 +4,7 @@ import {
   categorizeCourse,
   courseCategoryLabel,
   isRegularConnectListing,
+  inPersonCatalogTypeGroups,
   nextAolRadiusKm,
   parseCourseCategories,
   presentCourseCategories,
@@ -90,6 +91,13 @@ describe('course categories', () => {
       'beginner',
       'regular_connects'
     ]);
+  });
+
+  it('requests Intuition Process types with the kids catalog and leaves Follow Up out', () => {
+    const groups = inPersonCatalogTypeGroups();
+    const kids = groups.find((group) => group.includes('1495970'));
+    expect(kids).toEqual(expect.arrayContaining(['1495970', '384230', '602859']));
+    expect(groups.some((group) => group.includes('351956'))).toBe(false);
   });
 
   it('expands the in-person radius ladder from 3 km', () => {
