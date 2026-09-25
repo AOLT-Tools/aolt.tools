@@ -11,6 +11,7 @@ import {
   assignMembersToUser as assignMockMembersToUser,
   createCourseForUser as createMockCourseForUser,
   createLeadForUser as createMockLeadForUser,
+  importLeadsForUser as importMockLeadsForUser,
   deleteCourseForUser as deleteMockCourseForUser,
   deleteLeadForUser as deleteMockLeadForUser,
   getBootstrapForUser as getMockBootstrapForUser,
@@ -63,6 +64,16 @@ export const mockDataStore: ApiDataStore = {
     return {
       allowed: true,
       value: await createMockLeadForUser(user, CreateLeadRequestSchema.parse(payload))
+    };
+  },
+
+  async importLeadsForAuthorizedUser(user, payload) {
+    if (!isMockUserAllowed(user.email)) {
+      return { allowed: false };
+    }
+    return {
+      allowed: true,
+      value: await importMockLeadsForUser(user, payload as { campaignId?: unknown; rows?: unknown })
     };
   },
 

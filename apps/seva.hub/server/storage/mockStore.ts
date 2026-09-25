@@ -1,11 +1,14 @@
 import {
+  ALL_LEADS_SCOPE_ID,
   AssignMembersRequestSchema,
+  isAllLeadsScope,
   AssignMembersResponseSchema,
   BootstrapResponseSchema,
   CreateCourseRequestSchema,
   CreateCourseResponseSchema,
   CreateLeadRequestSchema,
   CreateLeadResponseSchema,
+  ImportLeadsResponseSchema,
   DeleteCourseRequestSchema,
   DeleteCourseResponseSchema,
   DeleteLeadRequestSchema,
@@ -45,7 +48,13 @@ import {
   type CourseRecord
 } from '../courses/sheetMapping.js';
 import { createMemoryImageStore, decodeImageBase64 } from '../courses/images.js';
-import { normalizeEmail } from '@aolt/core/normalization';
+import { normalizeEmail, normalizeIndianMobile } from '@aolt/core/normalization';
+import {
+  LeadImportError,
+  MAX_IMPORT_ROWS,
+  planLeadImport,
+  sheetTooLargeMessage
+} from '../../shared/contracts/leadImport.js';
 
 type StoreState = {
   leads: Lead[];
@@ -108,6 +117,25 @@ export async function getBootstrapForUser(
   campaignId?: string | null
 ) {
   const store = getStore();
+  if (isAllLeadsScope(campaignId)) {
+    const leadCampaignIds = new Set(
+      mockBootstrapData.config.campaigns
+        .filter((campaign) => campaign.type === 'Leads')
+        .map((campaign) => campaign.id)
+    );
+    return BootstrapResponseSchema.parse({
+      ...mockBootstrapData,
+      user,
+      campaignId: ALL_LEADS_SCOPE_ID,
+      leads: store.leads.filter(
+        (lead) =>
+          isAssignedToUser(lead, String(user.email || '')) &&
+          lead.campaignType === 'Leads' &&
+          leadCampaignIds.has(String(lead.campaignId || ''))
+      )
+    });
+  }
+
   const selectedCampaignId = campaignId || mockBootstrapData.campaignId;
   const selectedCampaign = mockBootstrapData.config.campaigns.find(
     (campaign: { id: string }) => campaign.id === selectedCampaignId
@@ -253,6 +281,76 @@ export async function createLeadForUser(
   };
   store.leads.push(lead);
   return CreateLeadResponseSchema.parse({ success: true, lead });
+}
+
+export async function importLeadsForUser(
+  user: AuthenticatedUser,
+  payload: { campaignId?: unknown; rows?: unknown }
+) {
+  const store = getStore();
+  const campaignId =
+    typeof payload.campaignId === 'string' ? payload.campaignId.trim() : '';
+  const rows = Array.isArray(payload.rows)
+    ? payload.rows.map((row) =>
+        Array.isArray(row) ? row.map((cell) => (cell == null ? '' : String(cell))) : []
+      )
+    : [];
+  if (rows.length > MAX_IMPORT_ROWS + 1) {
+    throw new LeadImportError('SHEET_TOO_LARGE', sheetTooLargeMessage());
+  }
+  const campaign = mockBootstrapData.config.campaigns.find((item) => item.id === campaignId);
+  if (!campaign) {
+    throw new Error('CAMPAIGN_NOT_FOUND');
+  }
+  if (campaign.type !== 'Leads') {
+    throw new Error('CAMPAIGN_TYPE_MISMATCH');
+  }
+
+  const existingMobiles = new Set(
+    store.leads
+      .filter((lead) => lead.campaignType !== 'Members')
+      .map((lead) => normalizeIndianMobile(lead.mobile))
+      .filter(Boolean)
+  );
+  const plan = planLeadImport(rows, existingMobiles);
+  if (plan.outcome === 'needs_columns') {
+    return ImportLeadsResponseSchema.parse({
+      success: true,
+      outcome: 'needs_columns',
+      importedCount: 0,
+      skippedCount: 0,
+      invalidCount: 0,
+      missingColumns: plan.missingColumns,
+      leads: []
+    });
+  }
+
+  const assignee = normalizeEmail(user.email);
+  const leads: Lead[] = plan.leads.map((item) => ({
+    id: nanoid(),
+    mobile: item.mobile,
+    name: item.name,
+    quality: 'Quality',
+    followUp: 'Follow-up',
+    lastUpdated: new Date().toISOString(),
+    status: 'Response',
+    notes: item.notes,
+    campaignId: campaign.id,
+    campaignType: 'Leads',
+    assignedVolunteerEmail: assignee,
+    wishlistPrograms: '',
+    donePrograms: ''
+  }));
+  store.leads.push(...leads);
+  return ImportLeadsResponseSchema.parse({
+    success: true,
+    outcome: 'imported',
+    importedCount: leads.length,
+    skippedCount: plan.skippedCount,
+    invalidCount: plan.invalidCount,
+    missingColumns: [],
+    leads
+  });
 }
 
 export async function deleteLeadForUser(

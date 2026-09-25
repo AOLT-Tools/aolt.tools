@@ -147,6 +147,11 @@ export interface SevaWorkspaceState {
   isCampaignSwitching: boolean;
   isCampaignRefreshing: boolean;
   isAssignMembersModalOpen: boolean;
+  isImportLeadsModalOpen: boolean;
+  importSheetUrl: string;
+  importLeadsMessage: string;
+  importLeadsNeedsRetry: boolean;
+  isImportingLeads: boolean;
   assignMembersDraft: AssignMembersDraft;
   isAssigningMembers: boolean;
   qualityMetaMap: Record<string, QualityMeta>;

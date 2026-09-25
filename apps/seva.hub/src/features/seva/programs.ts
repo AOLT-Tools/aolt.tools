@@ -1,5 +1,37 @@
 import type { SevaWorkspaceContext, Lead, Program } from './types';
 
+const MONTH_SHORT_FORMS: Array<[string, string]> = [
+  ['january', 'Jan'],
+  ['february', 'Feb'],
+  ['march', 'Mar'],
+  ['april', 'Apr'],
+  ['may', 'May'],
+  ['june', 'Jun'],
+  ['july', 'Jul'],
+  ['august', 'Aug'],
+  ['september', 'Sep'],
+  ['october', 'Oct'],
+  ['november', 'Nov'],
+  ['december', 'Dec']
+];
+
+function leadCampaignMonthShort(name: string): string {
+  const value = String(name || '').toLowerCase();
+  for (const [full, short] of MONTH_SHORT_FORMS) {
+    if (new RegExp('(^|[^a-z])' + full + '([^a-z]|$)').test(value)) {
+      return short;
+    }
+  }
+  const tokens = value.split(/[^a-z]+/).filter(Boolean);
+  for (const token of tokens) {
+    const match = MONTH_SHORT_FORMS.find(([, short]) => short.toLowerCase() === token);
+    if (match) {
+      return match[1];
+    }
+  }
+  return '';
+}
+
 export function createProgramMethods() {
   return {
     parsePrograms(
@@ -130,6 +162,40 @@ export function createProgramMethods() {
         return done;
       }
       return '✏️ Program';
+    },
+    getLeadProgramCourse(this: SevaWorkspaceContext, lead: Lead): string {
+      return this.leadProgramParts(lead).course;
+    },
+    getLeadProgramMonth(this: SevaWorkspaceContext, lead: Lead): string {
+      return this.leadProgramParts(lead).month;
+    },
+    getLeadProgramAfter(this: SevaWorkspaceContext, lead: Lead): string {
+      return this.leadProgramParts(lead).after;
+    },
+    leadProgramParts(this: SevaWorkspaceContext, lead: Lead): {
+      course: string;
+      month: string;
+      after: string;
+    } {
+      const summary = lead.programSummary || this.getProgramSummary(lead);
+      const month = this.isAllLeadsView()
+        ? leadCampaignMonthShort(this.getLeadCampaignName(lead))
+        : '';
+      if (!month) {
+        return { course: summary, month: '', after: '' };
+      }
+      const separator = ' | ';
+      const segments = summary.split(separator);
+      const targetIndex = segments.findIndex((segment) => segment.startsWith('🎯'));
+      if (targetIndex < 0) {
+        return { course: summary, month, after: '' };
+      }
+      const afterSegments = segments.slice(targetIndex + 1);
+      return {
+        course: segments.slice(0, targetIndex + 1).join(separator),
+        month,
+        after: afterSegments.length ? separator + afterSegments.join(separator) : ''
+      };
     },
     refreshLeadProgramSummary(this: SevaWorkspaceContext, lead: Lead): void {
       lead.programSummary = this.getProgramSummary(lead);

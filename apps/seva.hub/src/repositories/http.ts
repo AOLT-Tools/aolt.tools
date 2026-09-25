@@ -8,6 +8,8 @@ import {
   CreateCourseResponseSchema,
   CreateLeadRequestSchema,
   CreateLeadResponseSchema,
+  ImportLeadsRequestSchema,
+  ImportLeadsResponseSchema,
   DeleteCourseRequestSchema,
   DeleteCourseResponseSchema,
   DeleteLeadRequestSchema,
@@ -25,6 +27,8 @@ import {
   type CreateCourseResponse,
   type CreateLeadRequest,
   type CreateLeadResponse,
+  type ImportLeadsRequest,
+  type ImportLeadsResponse,
   type DeleteCourseRequest,
   type DeleteCourseResponse,
   type DeleteLeadRequest,
@@ -96,6 +100,12 @@ export class HttpLeadRepository implements LeadRepository {
     const parsed = CreateLeadRequestSchema.parse(payload);
     const response = await this.apiClient.post<unknown>('/api/seva/leads', parsed);
     return CreateLeadResponseSchema.parse(response);
+  }
+
+  async importLeads(payload: ImportLeadsRequest): Promise<ImportLeadsResponse> {
+    const parsed = ImportLeadsRequestSchema.parse(payload);
+    const response = await this.apiClient.post<unknown>('/api/seva/leads/import', parsed);
+    return ImportLeadsResponseSchema.parse(response);
   }
 
   async deleteLead(payload: DeleteLeadRequest): Promise<DeleteLeadResponse> {

@@ -245,6 +245,17 @@ export type GoogleSheetsApi<TTarget extends string> = {
     rowValues: string[],
     operation?: SheetsOperation
   ) => Promise<void>;
+  appendSheetRows: (
+    target: TTarget,
+    range: string,
+    rows: string[][],
+    operation?: SheetsOperation
+  ) => Promise<void>;
+  readSharedSpreadsheetGrid: (
+    spreadsheetId: string,
+    gid: string,
+    operation?: SheetsOperation
+  ) => Promise<unknown[][]>;
   readSheetTitles: (target: TTarget, operation?: SheetsOperation) => Promise<string[]>;
   addSheet: (
     target: TTarget,
@@ -375,6 +386,32 @@ export function createGoogleSheetsApi<TTarget extends string>(
     }
   }
 
+  async function appendRows(
+    target: TTarget,
+    range: string,
+    rows: string[][],
+    operation?: SheetsOperation
+  ): Promise<void> {
+    if (!rows.length) {
+      return;
+    }
+    const url = buildGoogleSheetsAppendUrl(
+      getSpreadsheetId(target),
+      range,
+      'valueInputOption=RAW&insertDataOption=INSERT_ROWS'
+    );
+    await callSheetsApi(
+      target,
+      'values.append',
+      url,
+      {
+        method: 'POST',
+        data: { values: rows }
+      },
+      operation
+    );
+  }
+
   return {
     async readSheetValues(target, range, operation) {
       const payload = await callSheetsApi<SheetsValuesResponse>(
@@ -431,21 +468,48 @@ export function createGoogleSheetsApi<TTarget extends string>(
     },
 
     async appendSheetRow(target, range, rowValues, operation) {
-      const url = buildGoogleSheetsAppendUrl(
-        getSpreadsheetId(target),
-        range,
-        'valueInputOption=RAW&insertDataOption=INSERT_ROWS'
-      );
-      await callSheetsApi(
-        target,
-        'values.append',
-        url,
-        {
-          method: 'POST',
-          data: { values: [rowValues] }
-        },
+      await appendRows(target, range, [rowValues], operation);
+    },
+
+    async appendSheetRows(target, range, rows, operation) {
+      await appendRows(target, range, rows, operation);
+    },
+
+    async readSharedSpreadsheetGrid(spreadsheetId, gid, operation) {
+      if (!/^[A-Za-z0-9_-]{10,128}$/.test(spreadsheetId) || !/^\d+$/.test(gid)) {
+        throw new Error('Invalid spreadsheet reference.');
+      }
+      const meta = await callSheetsApi<{
+        sheets?: Array<{ properties?: { sheetId?: number; title?: string } }>;
+      }>(
+        Object.keys(options.getCredentials().spreadsheetIds)[0] as TTarget,
+        'spreadsheets.get',
+        'https://sheets.googleapis.com/v4/spreadsheets/' +
+          spreadsheetId +
+          '?fields=' +
+          encodeURIComponent('sheets.properties(sheetId,title)'),
+        { method: 'GET' },
         operation
       );
+      const sheets = Array.isArray(meta.sheets) ? meta.sheets : [];
+      const requestedId = Number(gid);
+      let sheet = sheets.find((item) => item.properties?.sheetId === requestedId);
+      if (!sheet && requestedId === 0) {
+        sheet = sheets[0];
+      }
+      const title = sheet?.properties?.title;
+      if (!title) {
+        throw new Error('Spreadsheet tab was not found.');
+      }
+      const range = "'" + title.replace(/'/g, "''") + "'!A:ZZ";
+      const payload = await callSheetsApi<SheetsValuesResponse>(
+        Object.keys(options.getCredentials().spreadsheetIds)[0] as TTarget,
+        'values.get',
+        buildGoogleSheetsValuesUrl(spreadsheetId, range),
+        { method: 'GET' },
+        operation
+      );
+      return Array.isArray(payload.values) ? payload.values : [];
     },
 
     async readSheetTitles(target, operation) {

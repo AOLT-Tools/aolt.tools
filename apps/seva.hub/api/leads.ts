@@ -4,6 +4,10 @@ import {
   type ApiResponse
 } from '@aolt/core/api';
 import { methodNotAllowed, sendApiError } from '../server/errors.js';
+import {
+  LeadImportError,
+  readImportLeadsRequest
+} from '../shared/contracts/leadImport.js';
 
 async function loadSessionUser(req: ApiRequest) {
   const { readSessionUser } = await import('../server/auth/session.js');
@@ -22,6 +26,22 @@ function requestBody(req: ApiRequest): Record<string, unknown> {
 }
 
 function contextFor(req: ApiRequest, action: string) {
+  if (action === 'import') {
+    return {
+      route: 'POST /api/leads?action=import',
+      action: 'import_leads',
+      startedAt: Date.now(),
+      messages: {
+        validation: 'Check the Google Sheet link and try again.',
+        timeout: 'Unable to import leads right now. Please try again.',
+        upstream: 'Unable to import leads right now. Please try again.',
+        upstreamPermission:
+          'Unable to import leads. Please contact an admin if this continues.',
+        internal: 'Unable to import leads.'
+      }
+    };
+  }
+
   if (action === 'assign') {
     return {
       route: 'POST /api/leads?action=assign',
@@ -75,7 +95,28 @@ function sendCommonLeadError(
   context: ReturnType<typeof contextFor>,
   assignment = false
 ) {
+  if (error instanceof LeadImportError) {
+    return sendApiError(res, error, context, {
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: error.message,
+      retryable: false,
+      category: 'validation'
+    });
+  }
+
   const message = error instanceof Error ? error.message : '';
+
+  if (message.includes('Lead sheet must contain')) {
+    return sendApiError(res, error, context, {
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message:
+        'Leads cannot be imported until the sheet has id, mobile, and campaign columns.',
+      retryable: false,
+      category: 'internal'
+    });
+  }
 
   if (message.includes('FORBIDDEN_LEAD_ASSIGNMENT')) {
     return sendApiError(res, error, context, {
@@ -123,7 +164,9 @@ function sendCommonLeadError(
       code: 'VALIDATION_ERROR',
       message: assignment
         ? 'Member assignment is only available for Members Seva.'
-        : reqMismatchMessage(context.action),
+        : context.action === 'import_leads'
+          ? 'Choose a leads month before importing.'
+          : reqMismatchMessage(context.action),
       retryable: false,
       category: 'validation'
     });
@@ -142,16 +185,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const action = firstQueryValue(req, 'action').trim().toLowerCase();
   const id = firstQueryValue(req, 'id').trim();
   const isAssign = action === 'assign';
+  const isImport = action === 'import';
   const isMutate = req.method === 'PUT' || req.method === 'DELETE';
   const context = contextFor(req, action);
 
-  if (isAssign && req.method !== 'POST') {
+  if ((isAssign || isImport) && req.method !== 'POST') {
     return methodNotAllowed(res, context, 'POST');
   }
-  if (!isAssign && isMutate && !id) {
+  if (!isAssign && !isImport && isMutate && !id) {
     return methodNotAllowed(res, context, 'POST, PUT, DELETE');
   }
-  if (!isAssign && !isMutate && req.method !== 'POST') {
+  if (!isAssign && !isImport && !isMutate && req.method !== 'POST') {
     return methodNotAllowed(res, context, 'POST, PUT, DELETE');
   }
 
@@ -168,6 +212,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const store = await loadDataStore();
+    if (isImport) {
+      const { loadImportSheetRows } = await import('../server/leads/importSheet.js');
+      const request = readImportLeadsRequest(req.body);
+      const rows = await loadImportSheetRows(request.sheetUrl);
+      const result = await store.importLeadsForAuthorizedUser(user, {
+        campaignId: request.campaignId,
+        rows
+      });
+      if (!result.allowed) {
+        return sendApiError(res, new Error('Authorization denied.'), context, {
+          status: 403,
+          code: 'FORBIDDEN',
+          message: 'Your account is not authorized to access this application.',
+          retryable: false,
+          category: 'authorization_denied'
+        });
+      }
+      return res.status(200).json(result.value);
+    }
+
     const result = isAssign
       ? await store.assignMembersForAuthorizedUser(user, req.body)
       : req.method === 'DELETE'

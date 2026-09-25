@@ -88,6 +88,11 @@ export function createSevaWorkspaceInitialState(): SevaWorkspaceState {
     isCampaignSwitching: false,
     isCampaignRefreshing: false,
     isAssignMembersModalOpen: false,
+    isImportLeadsModalOpen: false,
+    importSheetUrl: '',
+    importLeadsMessage: '',
+    importLeadsNeedsRetry: false,
+    isImportingLeads: false,
     assignMembersDraft: {
       count: 10,
       engagementLevels: []

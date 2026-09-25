@@ -1,4 +1,5 @@
 import {
+  isAllLeadsScope,
   MAX_MEMBERS_PER_VOLUNTEER,
   type UpdateLeadRequest
 } from '../../../shared/contracts/appContracts';
@@ -11,6 +12,12 @@ import type {
 } from './types';
 import { toUserErrorMessage } from '../../services/apiClient';
 import { normalizeIndianMobile } from '@aolt/core/normalization';
+import {
+  CHOOSE_MONTH_MESSAGE,
+  formatImportResult,
+  parseGoogleSheetUrl,
+  PASTE_SHEET_LINK_MESSAGE
+} from '../../../shared/contracts/leadImport';
 
 const CARD_LONG_PRESS_MS = 500;
 const CARD_MOVE_TOLERANCE_PX = 10;
@@ -89,6 +96,17 @@ function toUpdateRequest(
     wishlistPrograms: context.getProgramListForSave(snapshot.wishlistPrograms),
     donePrograms: context.getProgramListForSave(snapshot.donePrograms)
   };
+}
+
+function campaignForRecord(
+  context: SevaWorkspaceContext,
+  lead: Lead
+): Campaign | undefined {
+  const fromLead = context.campaigns.find((campaign) => campaign.id === lead.campaignId);
+  if (fromLead) {
+    return fromLead;
+  }
+  return context.campaigns.find((campaign) => campaign.id === context.selectedCampaignId);
 }
 
 function getMoveCampaignDestinations(context: SevaWorkspaceContext): Campaign[] {
@@ -291,9 +309,18 @@ export function createRecordActionMethods() {
             .map((lead) => lead.id)
         );
         if (this.campaignType !== 'Members') {
-          this.leads = this.leads.filter((lead) => !movedIds.has(lead.id));
-          if (movedIds.has(this.activeCardId)) {
-            this.activeCardId = '';
+          if (isAllLeadsScope(this.selectedCampaignId)) {
+            records.forEach((lead) => {
+              if (movedIds.has(lead.id)) {
+                lead.campaignId = campaign.id;
+                lead.campaignType = campaign.type;
+              }
+            });
+          } else {
+            this.leads = this.leads.filter((lead) => !movedIds.has(lead.id));
+            if (movedIds.has(this.activeCardId)) {
+              this.activeCardId = '';
+            }
           }
         }
         this.selectedIds = new Set(
@@ -396,12 +423,9 @@ export function createRecordActionMethods() {
         .trim()
         .toLowerCase();
       const records = getSelectedRecords(this);
-      const campaign = this.campaigns.find(
-        (item) => item.id === this.selectedCampaignId
-      );
       if (
         !records.length ||
-        !campaign ||
+        records.some((lead) => !campaignForRecord(this, lead)) ||
         !getAllowedVolunteers(this).some(
           (volunteer) => volunteer.email === normalizedEmail
         )
@@ -418,12 +442,16 @@ export function createRecordActionMethods() {
           this.authError = 'Save pending edits before reassigning these records.';
           return;
         }
-        const results = await runSequentialLeadRequests(records, (lead) =>
-          window.appRuntime.updateLead({
-            ...toUpdateRequest(this, lead, campaign),
+        const results = await runSequentialLeadRequests(records, (lead) => {
+          const recordCampaign = campaignForRecord(this, lead);
+          if (!recordCampaign) {
+            return Promise.reject(new Error('Campaign not found.'));
+          }
+          return window.appRuntime.updateLead({
+            ...toUpdateRequest(this, lead, recordCampaign),
             assignedVolunteerEmail: normalizedEmail
-          })
-        );
+          });
+        });
         const reassignedIds = new Set(
           records
             .filter((_, index) => results[index].status === 'fulfilled')
@@ -645,7 +673,11 @@ export function createRecordActionMethods() {
           campaignId: this.createRecordDraft.campaignId,
           campaignType: this.createRecordType
         });
-        if (response.lead.campaignId === this.selectedCampaignId) {
+        if (
+          response.lead.campaignId === this.selectedCampaignId ||
+          (isAllLeadsScope(this.selectedCampaignId) &&
+            response.lead.campaignType === 'Leads')
+        ) {
           this.leads = [this.normalizeLead(response.lead), ...this.leads];
         }
         this.isCreateRecordModalOpen = false;
@@ -659,6 +691,71 @@ export function createRecordActionMethods() {
         );
       } finally {
         this.isCreateRecordSaving = false;
+      }
+    },
+    openImportLeads(this: SevaWorkspaceContext): void {
+      this.closeFab();
+      this.importSheetUrl = '';
+      this.importLeadsMessage = '';
+      this.importLeadsNeedsRetry = false;
+      this.isImportLeadsModalOpen = true;
+    },
+    closeImportLeads(this: SevaWorkspaceContext): void {
+      if (!this.isImportingLeads) {
+        this.isImportLeadsModalOpen = false;
+      }
+    },
+    importLeadsButtonLabel(this: SevaWorkspaceContext): string {
+      if (this.isImportingLeads) {
+        return 'Importing…';
+      }
+      if (this.importLeadsNeedsRetry) {
+        return 'Try Again';
+      }
+      return 'Import';
+    },
+    async submitLeadImport(this: SevaWorkspaceContext): Promise<void> {
+      if (this.isImportingLeads) {
+        return;
+      }
+      if (this.campaignType === 'Members' || this.isAllLeadsView()) {
+        this.importLeadsMessage = CHOOSE_MONTH_MESSAGE;
+        this.importLeadsNeedsRetry = false;
+        return;
+      }
+      const sheetUrl = String(this.importSheetUrl || '').trim();
+      if (!parseGoogleSheetUrl(sheetUrl)) {
+        this.importLeadsMessage = PASTE_SHEET_LINK_MESSAGE;
+        this.importLeadsNeedsRetry = true;
+        return;
+      }
+
+      this.isImportingLeads = true;
+      this.importLeadsMessage = '';
+      this.importLeadsNeedsRetry = false;
+      try {
+        const response = await window.appRuntime.importLeads({
+          sheetUrl,
+          campaignId: this.selectedCampaignId
+        });
+        const formatted = formatImportResult(response);
+        this.importLeadsMessage = formatted.message;
+        this.importLeadsNeedsRetry = formatted.needsRetry;
+        if (response.outcome === 'imported' && response.leads.length) {
+          this.leads = [
+            ...response.leads.map((lead) => this.normalizeLead(lead)),
+            ...this.leads
+          ];
+        }
+      } catch (error) {
+        const fallback =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Unable to import leads. Please try again.';
+        this.importLeadsMessage = toUserErrorMessage(error, fallback);
+        this.importLeadsNeedsRetry = true;
+      } finally {
+        this.isImportingLeads = false;
       }
     }
   };

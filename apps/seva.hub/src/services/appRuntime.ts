@@ -14,6 +14,7 @@ import type {
   AssignMembersRequest,
   CreateCourseRequest,
   CreateLeadRequest,
+  ImportLeadsRequest,
   DeleteCourseRequest,
   DeleteLeadRequest,
   UpdateCourseRequest,
@@ -94,6 +95,9 @@ export const appRuntime = {
   },
   async createLead(payload: CreateLeadRequest) {
     return (await getLeadRepository()).createLead(payload);
+  },
+  async importLeads(payload: ImportLeadsRequest) {
+    return (await getLeadRepository()).importLeads(payload);
   },
   async updateLead(payload: UpdateLeadRequest) {
     return (await getLeadRepository()).updateLead(payload);

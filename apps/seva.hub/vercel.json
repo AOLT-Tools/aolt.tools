@@ -40,6 +40,10 @@
       "destination": "/api/leads?action=assign"
     },
     {
+      "source": "/api/seva/leads/import",
+      "destination": "/api/leads?action=import"
+    },
+    {
       "source": "/api/seva/leads/:id",
       "destination": "/api/leads?id=:id"
     },

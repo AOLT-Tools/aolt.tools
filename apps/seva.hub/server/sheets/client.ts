@@ -37,4 +37,6 @@ export const readSheetValues = sheetsApi.readSheetValues;
 export const readSheetValuesBatch = sheetsApi.readSheetValuesBatch;
 export const updateSheetValuesBatch = sheetsApi.updateSheetValuesBatch;
 export const appendSheetRow = sheetsApi.appendSheetRow;
+export const appendSheetRows = sheetsApi.appendSheetRows;
+export const readSharedSpreadsheetGrid = sheetsApi.readSharedSpreadsheetGrid;
 export const deleteSheetRow = sheetsApi.deleteSheetRow;

@@ -2,8 +2,13 @@ import type {
   SevaWorkspaceContext,
   Campaign,
   CampaignUiMeta,
+  Lead,
   OptionItem
 } from './types';
+import {
+  ALL_LEADS_SCOPE_ID,
+  isAllLeadsScope
+} from '../../../shared/contracts/appContracts';
 import { isApiClientError, toUserErrorMessage } from '../../services/apiClient';
 import {
   getDefaultCampaignUiMeta,
@@ -88,6 +93,9 @@ const SIGN_OUT_SAVE_ERROR =
   'Some changes could not be saved. Please retry before signing out.';
 const CAMPAIGN_URL_PARAM = 'campaignId';
 const PENDING_CAMPAIGN_STORAGE_KEY = 'sevaHub.pendingCampaignId';
+const LEAD_SCOPE_STORAGE_KEY = 'sevaHub.leadScopeByUser';
+const CAMPAIGN_ID_PATTERN = /^[A-Za-z0-9_-]{21}$/;
+const MISSING_CAMPAIGN_MESSAGE = 'Campaign not found.';
 
 function getSessionStorage(): Storage | undefined {
   if (typeof window === 'undefined') {
@@ -98,6 +106,79 @@ function getSessionStorage(): Storage | undefined {
   } catch {
     return undefined;
   }
+}
+
+function getLocalStorage(): Storage | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function readLeadScopeMap(storage: Storage): Record<string, string> {
+  try {
+    const parsed = JSON.parse(storage.getItem(LEAD_SCOPE_STORAGE_KEY) || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function isRememberedCampaignId(value: string): boolean {
+  return isAllLeadsScope(value) || CAMPAIGN_ID_PATTERN.test(value);
+}
+
+function readStoredLeadScope(email: string): string {
+  const normalizedEmail = email.trim().toLowerCase();
+  const storage = getLocalStorage();
+  if (!normalizedEmail || !storage) {
+    return '';
+  }
+  const value = String(readLeadScopeMap(storage)[normalizedEmail] || '').trim();
+  return isRememberedCampaignId(value) ? value : '';
+}
+
+function writeStoredLeadScope(email: string, campaignId: string): void {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedCampaignId = campaignId.trim();
+  const storage = getLocalStorage();
+  if (!normalizedEmail || !isRememberedCampaignId(normalizedCampaignId) || !storage) {
+    return;
+  }
+  try {
+    const scopes = readLeadScopeMap(storage);
+    scopes[normalizedEmail] = normalizedCampaignId;
+    storage.setItem(LEAD_SCOPE_STORAGE_KEY, JSON.stringify(scopes));
+  } catch {
+    // The current session still shows the selection when storage is blocked.
+  }
+}
+
+function resolveCampaignIdForLogin(email: string, requestedCampaignId: string): string {
+  const requested = String(requestedCampaignId || '').trim();
+  if (requested) {
+    return requested;
+  }
+  return readStoredLeadScope(email) || ALL_LEADS_SCOPE_ID;
+}
+
+function isMissingCampaignError(error: unknown): boolean {
+  if (isApiClientError(error) && error.code === 'NOT_FOUND') {
+    return true;
+  }
+  return (
+    error instanceof Error &&
+    (error.message === MISSING_CAMPAIGN_MESSAGE ||
+      error.message.startsWith('Campaign not found:') ||
+      error.message.includes('CAMPAIGN_NOT_FOUND'))
+  );
 }
 
 function readCampaignIdFromUrl(): string {
@@ -188,7 +269,7 @@ export function createAuthAndBootstrapMethods() {
           .trim()
           .toLowerCase();
         this.isVolunteerModalOpen = false;
-        await this.loadBootstrap(requestedCampaignId || undefined);
+        await this.openAuthenticatedWorkspace(requestedCampaignId);
       } catch (error) {
         this.authError = toAuthErrorMessage(
           error,
@@ -209,7 +290,7 @@ export function createAuthAndBootstrapMethods() {
           .trim()
           .toLowerCase();
         this.isVolunteerModalOpen = false;
-        await this.loadBootstrap(requestedCampaignId || undefined);
+        await this.openAuthenticatedWorkspace(requestedCampaignId);
       } catch (error) {
         this.authError = toAuthErrorMessage(error, 'Sign in failed. Please try again.');
         this.isVolunteerModalOpen = true;
@@ -275,6 +356,11 @@ export function createAuthAndBootstrapMethods() {
       this.isFollowUpModalOpen = false;
       this.isProgramEditorOpen = false;
       this.isAssignMembersModalOpen = false;
+      this.isImportLeadsModalOpen = false;
+      this.importSheetUrl = '';
+      this.importLeadsMessage = '';
+      this.importLeadsNeedsRetry = false;
+      this.isImportingLeads = false;
       this.leads = [];
       this.campaigns = [];
       this.selectedCampaign = null;
@@ -285,6 +371,22 @@ export function createAuthAndBootstrapMethods() {
       this.programFilter = '';
       this.activeCardId = '';
       this.clearSelection();
+    },
+    async openAuthenticatedWorkspace(
+      this: SevaWorkspaceContext,
+      requestedCampaignId = ''
+    ): Promise<void> {
+      const campaignId = resolveCampaignIdForLogin(
+        this.volunteerEmail,
+        requestedCampaignId
+      );
+      const loaded = await this.loadBootstrap(campaignId);
+      if (loaded || isAllLeadsScope(campaignId)) {
+        return;
+      }
+      if (this.authError === MISSING_CAMPAIGN_MESSAGE) {
+        await this.loadBootstrap(ALL_LEADS_SCOPE_ID);
+      }
     },
     async onCampaignChange(
       this: SevaWorkspaceContext,
@@ -357,7 +459,17 @@ export function createAuthAndBootstrapMethods() {
         this.isCampaignRefreshing = false;
       }
     },
+    isAllLeadsView(this: SevaWorkspaceContext): boolean {
+      return isAllLeadsScope(this.selectedCampaignId);
+    },
+    getLeadCampaignName(this: SevaWorkspaceContext, lead: Lead): string {
+      const campaign = this.campaigns.find((item) => item.id === lead.campaignId);
+      return campaign && campaign.name ? campaign.name : '';
+    },
     getSelectedCampaignName(this: SevaWorkspaceContext): string {
+      if (isAllLeadsScope(this.selectedCampaignId)) {
+        return 'All';
+      }
       if (this.selectedCampaign && this.selectedCampaign.name) {
         return this.selectedCampaign.name;
       }
@@ -371,13 +483,20 @@ export function createAuthAndBootstrapMethods() {
 
       this.optionSheetMode = 'campaign';
       this.optionSheetTitle = 'Switch Seva';
-      this.optionSheetOptions = this.campaigns.map(
-        (campaign: Campaign): OptionItem => ({
-          value: campaign.id,
-          label: campaign.name,
-          icon: campaign.type === 'Members' ? '👥' : '📞'
-        })
-      );
+      this.optionSheetOptions = [
+        {
+          value: ALL_LEADS_SCOPE_ID,
+          label: 'All',
+          icon: '📋'
+        },
+        ...this.campaigns.map(
+          (campaign: Campaign): OptionItem => ({
+            value: campaign.id,
+            label: campaign.name,
+            icon: campaign.type === 'Members' ? '👥' : '📞'
+          })
+        )
+      ];
       this.currentOptionValue = this.selectedCampaignId;
       this.activeOptionLead = null;
       this.isOptionSheetOpen = true;
@@ -465,24 +584,30 @@ export function createAuthAndBootstrapMethods() {
         };
         this.refreshProgramCaches();
         this.campaigns = this.appConfig.campaigns || [];
-        this.selectedCampaignId =
-          response.campaignId ||
-          campaignId ||
-          (this.campaigns[0] ? this.campaigns[0].id : '');
+        if (isAllLeadsScope(response.campaignId)) {
+          this.selectedCampaignId = ALL_LEADS_SCOPE_ID;
+          this.selectedCampaign = null;
+          this.campaignType = 'Leads';
+          this.campaignMessage = '';
+        } else {
+          this.selectedCampaignId =
+            response.campaignId ||
+            campaignId ||
+            (this.campaigns[0] ? this.campaigns[0].id : '');
+          this.selectedCampaign =
+            this.campaigns.find((item) => item.id === this.selectedCampaignId) ||
+            this.campaigns[0] ||
+            null;
+          this.campaignType = this.selectedCampaign ? this.selectedCampaign.type : 'Leads';
+          this.campaignMessage = this.selectedCampaign
+            ? this.selectedCampaign.message || ''
+            : '';
+        }
         if (this.selectedCampaignId) {
           updateCampaignUrl(this.selectedCampaignId);
           clearRequestedCampaignId();
+          writeStoredLeadScope(this.volunteerEmail, this.selectedCampaignId);
         }
-        this.selectedCampaign =
-          this.campaigns.find((item) => item.id === this.selectedCampaignId) ||
-          this.campaigns[0] ||
-          null;
-        this.campaignType = this.selectedCampaign
-          ? this.selectedCampaign.type
-          : 'Leads';
-        this.campaignMessage = this.selectedCampaign
-          ? this.selectedCampaign.message || ''
-          : '';
         this.qualityOptions = getDefaultQualityOptionsForCampaignType(
           this.campaignType
         ).map((label: string): OptionItem => {
@@ -525,10 +650,9 @@ export function createAuthAndBootstrapMethods() {
         } else {
           this.leads = [];
         }
-        this.authError = toAuthErrorMessage(
-          error,
-          'Unable to load Seva data. Please try again.'
-        );
+        this.authError = isMissingCampaignError(error)
+          ? MISSING_CAMPAIGN_MESSAGE
+          : toAuthErrorMessage(error, 'Unable to load Seva data. Please try again.');
         if (
           isApiClientError(error) &&
           (error.code === 'FORBIDDEN' || error.code === 'UNAUTHENTICATED')

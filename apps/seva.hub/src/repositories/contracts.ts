@@ -7,6 +7,8 @@ import type {
   CreateCourseResponse,
   CreateLeadRequest,
   CreateLeadResponse,
+  ImportLeadsRequest,
+  ImportLeadsResponse,
   DeleteCourseRequest,
   DeleteCourseResponse,
   DeleteLeadRequest,
@@ -28,6 +30,7 @@ export interface LeadRepository {
   getBootstrap(campaignId?: string | null): Promise<BootstrapResponse>;
   assignMembers(payload: AssignMembersRequest): Promise<AssignMembersResponse>;
   createLead(payload: CreateLeadRequest): Promise<CreateLeadResponse>;
+  importLeads(payload: ImportLeadsRequest): Promise<ImportLeadsResponse>;
   updateLead(payload: UpdateLeadRequest): Promise<UpdateLeadResponse>;
   deleteLead(payload: DeleteLeadRequest): Promise<DeleteLeadResponse>;
 }

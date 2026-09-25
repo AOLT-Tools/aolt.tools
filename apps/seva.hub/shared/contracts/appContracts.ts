@@ -6,6 +6,18 @@ const NanoIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9_-]{21}$/, 'Expected a Nano ID (21 chars).');
 
+/** Workspace scope that loads every Leads campaign instead of one month. */
+export const ALL_LEADS_SCOPE_ID = 'all';
+
+export function isAllLeadsScope(campaignId: string | null | undefined): boolean {
+  return String(campaignId || '').trim() === ALL_LEADS_SCOPE_ID;
+}
+
+const BootstrapCampaignIdSchema = z.union([
+  z.literal(ALL_LEADS_SCOPE_ID),
+  NanoIdSchema
+]);
+
 export const AuthenticatedUserSchema = z.object({
   id: z.string().min(1),
   email: z.email(),
@@ -84,7 +96,7 @@ export const LeadSchema = z.object({
 export const BootstrapResponseSchema = z.object({
   success: z.literal(true),
   user: AuthenticatedUserSchema,
-  campaignId: NanoIdSchema,
+  campaignId: BootstrapCampaignIdSchema,
   config: AppConfigSchema,
   leads: z.array(LeadSchema)
 });
@@ -150,6 +162,21 @@ export const CreateLeadRequestSchema = z.object({
 export const CreateLeadResponseSchema = z.object({
   success: z.literal(true),
   lead: LeadSchema
+});
+
+export const ImportLeadsRequestSchema = z.object({
+  sheetUrl: z.string().trim().min(1).max(2000),
+  campaignId: NanoIdSchema
+});
+
+export const ImportLeadsResponseSchema = z.object({
+  success: z.literal(true),
+  outcome: z.enum(['imported', 'needs_columns']),
+  importedCount: z.number().int().min(0),
+  skippedCount: z.number().int().min(0),
+  invalidCount: z.number().int().min(0),
+  missingColumns: z.array(z.enum(['Name', 'Mobile'])),
+  leads: z.array(LeadSchema)
 });
 
 export const DeleteLeadRequestSchema = z.object({
@@ -336,6 +363,8 @@ export type UpdateLeadRequest = z.infer<typeof UpdateLeadRequestSchema>;
 export type UpdateLeadResponse = z.infer<typeof UpdateLeadResponseSchema>;
 export type CreateLeadRequest = z.infer<typeof CreateLeadRequestSchema>;
 export type CreateLeadResponse = z.infer<typeof CreateLeadResponseSchema>;
+export type ImportLeadsRequest = z.infer<typeof ImportLeadsRequestSchema>;
+export type ImportLeadsResponse = z.infer<typeof ImportLeadsResponseSchema>;
 export type DeleteLeadRequest = z.infer<typeof DeleteLeadRequestSchema>;
 export type DeleteLeadResponse = z.infer<typeof DeleteLeadResponseSchema>;
 export type AssignMembersRequest = z.infer<typeof AssignMembersRequestSchema>;

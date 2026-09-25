@@ -1,12 +1,15 @@
 import {
+  ALL_LEADS_SCOPE_ID,
   AssignMembersRequestSchema,
   AssignMembersResponseSchema,
   AppConfigSchema,
   BootstrapResponseSchema,
+  isAllLeadsScope,
   CreateCourseRequestSchema,
   CreateCourseResponseSchema,
   CreateLeadRequestSchema,
   CreateLeadResponseSchema,
+  ImportLeadsResponseSchema,
   DeleteCourseRequestSchema,
   DeleteCourseResponseSchema,
   DeleteLeadRequestSchema,
@@ -26,6 +29,7 @@ import {
   type Course,
   type CreateCourseResponse,
   type CreateLeadResponse,
+  type ImportLeadsResponse,
   type DeleteCourseResponse,
   type DeleteLeadResponse,
   type Lead,
@@ -45,7 +49,13 @@ import {
 } from '../../shared/contracts/courseDefaults.mjs';
 import { defaultCourseTemplates } from '../../shared/contracts/courseTemplates.mjs';
 import { SHEET_HEADERS } from '../../shared/contracts/sheetContract.mjs';
-import { normalizeEmail } from '@aolt/core/normalization';
+import { normalizeEmail, normalizeIndianMobile } from '@aolt/core/normalization';
+import {
+  LeadImportError,
+  MAX_IMPORT_ROWS,
+  planLeadImport,
+  sheetTooLargeMessage
+} from '../../shared/contracts/leadImport.js';
 import {
   applyCourseDefaults,
   courseFromRow,
@@ -72,6 +82,7 @@ import {
 } from './table.js';
 import {
   appendSheetRow as defaultAppendSheetRow,
+  appendSheetRows as defaultAppendSheetRows,
   createSheetsOperation,
   deleteSheetRow as defaultDeleteSheetRow,
   readSheetValues as defaultReadSheetValues,
@@ -121,6 +132,12 @@ type AppendSheetRow = (
   rowValues: string[],
   operation?: SheetsOperation
 ) => Promise<void>;
+type AppendSheetRows = (
+  target: SpreadsheetTarget,
+  range: string,
+  rows: string[][],
+  operation?: SheetsOperation
+) => Promise<void>;
 type DeleteSheetRow = (
   target: SpreadsheetTarget,
   sheetName: string,
@@ -133,6 +150,7 @@ export type SheetsStoreDependencies = {
   readSheetValuesBatch?: ReadSheetValuesBatch;
   updateSheetValuesBatch?: UpdateSheetValuesBatch;
   appendSheetRow?: AppendSheetRow;
+  appendSheetRows?: AppendSheetRows;
   deleteSheetRow?: DeleteSheetRow;
   getSheetLayout?: () => SheetLayout;
   now?: () => Date;
@@ -431,6 +449,30 @@ function resolveUpdateCampaign(
   return campaign;
 }
 
+function toBootstrapResponse(
+  user: SessionUser,
+  snapshot: MetadataSnapshot,
+  campaignId: string,
+  leads: Lead[]
+): BootstrapResponse {
+  return BootstrapResponseSchema.parse({
+    success: true,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture
+    },
+    campaignId,
+    config: {
+      ...snapshot.config,
+      allowedUsers: [...snapshot.allowedUsers],
+      volunteers: snapshot.volunteers
+    },
+    leads
+  });
+}
+
 function rowMatchesCampaign(
   row: string[],
   columns: LeadColumnMap,
@@ -507,6 +549,7 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
   const updateSheetValuesBatch =
     dependencies.updateSheetValuesBatch || defaultUpdateSheetValuesBatch;
   const appendSheetRow = dependencies.appendSheetRow || defaultAppendSheetRow;
+  const appendSheetRows = dependencies.appendSheetRows || defaultAppendSheetRows;
   const deleteSheetRow = dependencies.deleteSheetRow || defaultDeleteSheetRow;
   const getSheetLayout = dependencies.getSheetLayout || defaultGetSheetLayout;
   const now = dependencies.now || (() => new Date());
@@ -581,12 +624,56 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     return snapshot.allowedUsers.has(normalizeEmail(user.email));
   }
 
+  async function getAllAssignedLeads(
+    user: SessionUser,
+    snapshot: MetadataSnapshot,
+    operation: SheetsOperation
+  ): Promise<BootstrapResponse> {
+    const leadsCampaigns = snapshot.config.campaigns.filter(
+      (campaign) => campaign.type === 'Leads'
+    );
+    const leadsCampaignById = new Map(
+      leadsCampaigns.map((campaign) => [campaign.id, campaign])
+    );
+    const layout = getSheetLayout();
+    const rows = await readSheetValues('data', layout.leadsRange, operation);
+    const headers = (rows[0] || []).map((value) => String(value || '').trim());
+    const leadColumns = resolveLeadColumns(headers);
+    const requestedEmail = normalizeEmail(user.email);
+    const leads: Lead[] = [];
+
+    for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+      const row = rows[rowIndex] || [];
+      const campaign = leadsCampaignById.get(getCell(row, leadColumns.campaignId));
+      if (!campaign) {
+        continue;
+      }
+      const recordCampaignType = getCell(row, leadColumns.campaignType);
+      if (recordCampaignType && recordCampaignType !== 'Leads') {
+        continue;
+      }
+      const assignedEmail = normalizeEmail(
+        getCell(row, leadColumns.assignedVolunteerEmail)
+      );
+      if (assignedEmail !== requestedEmail) {
+        continue;
+      }
+      leads.push(mapRowToLead(row, leadColumns, campaign));
+    }
+
+    return toBootstrapResponse(user, snapshot, ALL_LEADS_SCOPE_ID, leads);
+  }
+
   async function getBootstrap(
     user: SessionUser,
     snapshot: MetadataSnapshot,
     operation: SheetsOperation,
     campaignId?: string | null
   ): Promise<BootstrapResponse> {
+    if (isAllLeadsScope(campaignId)) {
+      return getAllAssignedLeads(user, snapshot, operation);
+    }
+
     const selectedCampaign = selectCampaign(snapshot, campaignId);
     const layout = getSheetLayout();
     const range =
@@ -611,22 +698,7 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       leads.push(mapRowToLead(row, leadColumns, selectedCampaign));
     }
 
-    return BootstrapResponseSchema.parse({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        picture: user.picture
-      },
-      campaignId: selectedCampaign.id,
-      config: {
-        ...snapshot.config,
-        allowedUsers: [...snapshot.allowedUsers],
-        volunteers: snapshot.volunteers
-      },
-      leads
-    });
+    return toBootstrapResponse(user, snapshot, selectedCampaign.id, leads);
   }
 
   async function assignMembers(
@@ -895,6 +967,131 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       donePrograms: ''
     });
     return CreateLeadResponseSchema.parse({ success: true, lead });
+  }
+
+  function readImportBatch(rawPayload: unknown): { campaignId: string; rows: string[][] } {
+    const record =
+      typeof rawPayload === 'object' && rawPayload && !Array.isArray(rawPayload)
+        ? (rawPayload as Record<string, unknown>)
+        : {};
+    const campaignId =
+      typeof record.campaignId === 'string' ? record.campaignId.trim() : '';
+    const rows = Array.isArray(record.rows)
+      ? record.rows.map((row) =>
+          Array.isArray(row)
+            ? row.map((cell) => (cell == null ? '' : String(cell)))
+            : []
+        )
+      : [];
+    return { campaignId, rows };
+  }
+
+  async function importLeads(
+    user: SessionUser,
+    snapshot: MetadataSnapshot,
+    operation: SheetsOperation,
+    rawPayload: unknown
+  ): Promise<ImportLeadsResponse> {
+    const payload = readImportBatch(rawPayload);
+    if (payload.rows.length > MAX_IMPORT_ROWS + 1) {
+      throw new LeadImportError('SHEET_TOO_LARGE', sheetTooLargeMessage());
+    }
+    const campaign = snapshot.config.campaigns.find((item) => item.id === payload.campaignId);
+    if (!campaign) {
+      throw new Error('CAMPAIGN_NOT_FOUND');
+    }
+    if (campaign.type !== 'Leads') {
+      throw new Error('CAMPAIGN_TYPE_MISMATCH');
+    }
+
+    const layout = getSheetLayout();
+    const sheetRows = await readSheetValues('data', layout.leadsRange, operation);
+    const headers = (sheetRows[0] || []).map((value) => String(value || '').trim());
+    if (!headers.length) {
+      throw new Error('Lead sheet is missing header row.');
+    }
+    const columns = resolveLeadColumns(headers);
+    if (columns.id < 0 || columns.campaignId < 0 || columns.mobile < 0) {
+      throw new Error('Lead sheet must contain id, mobile, and campaignId columns.');
+    }
+
+    const existingMobiles = new Set<string>();
+    for (let index = 1; index < sheetRows.length; index += 1) {
+      const mobile = normalizeIndianMobile(getCell(sheetRows[index], columns.mobile));
+      if (mobile) {
+        existingMobiles.add(mobile);
+      }
+    }
+
+    const plan = planLeadImport(payload.rows, existingMobiles);
+    if (plan.outcome === 'needs_columns') {
+      return ImportLeadsResponseSchema.parse({
+        success: true,
+        outcome: 'needs_columns',
+        importedCount: 0,
+        skippedCount: 0,
+        invalidCount: 0,
+        missingColumns: plan.missingColumns,
+        leads: []
+      });
+    }
+
+    const timestamp = now().toISOString();
+    const assignee = normalizeEmail(user.email);
+    const leads: Lead[] = [];
+    const appendedRows: string[][] = [];
+    plan.leads.forEach((item) => {
+      const id = nanoid();
+      const row = Array<string>(headers.length).fill('');
+      const setCell = (columnIndex: number, value: string) => {
+        if (columnIndex >= 0) {
+          row[columnIndex] = value;
+        }
+      };
+      setCell(columns.id, id);
+      setCell(columns.mobile, item.mobile);
+      setCell(columns.name, item.name);
+      setCell(columns.quality, 'Quality');
+      setCell(columns.followUp, 'Follow-up');
+      setCell(columns.lastUpdated, timestamp);
+      setCell(columns.status, 'Response');
+      setCell(columns.notes, item.notes);
+      setCell(columns.campaignId, campaign.id);
+      setCell(columns.campaignType, 'Leads');
+      setCell(columns.assignedVolunteerEmail, assignee);
+      appendedRows.push(row);
+      leads.push(
+        LeadSchema.parse({
+          id,
+          mobile: item.mobile,
+          name: item.name,
+          quality: 'Quality',
+          followUp: 'Follow-up',
+          lastUpdated: timestamp,
+          status: 'Response',
+          notes: item.notes,
+          campaignId: campaign.id,
+          campaignType: 'Leads',
+          assignedVolunteerEmail: assignee,
+          wishlistPrograms: '',
+          donePrograms: ''
+        })
+      );
+    });
+
+    if (appendedRows.length) {
+      await appendSheetRows('data', layout.leadsRange, appendedRows, operation);
+    }
+
+    return ImportLeadsResponseSchema.parse({
+      success: true,
+      outcome: 'imported',
+      importedCount: leads.length,
+      skippedCount: plan.skippedCount,
+      invalidCount: plan.invalidCount,
+      missingColumns: [],
+      leads
+    });
   }
 
   async function deleteLead(
@@ -1270,6 +1467,23 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
         return {
           allowed: true,
           value: await updateLead(user, snapshot, activeOperation, payload)
+        };
+      });
+    },
+
+    async importLeadsForAuthorizedUser(
+      user: SessionUser,
+      payload: unknown,
+      operation?: SheetsOperation
+    ): Promise<AuthorizedStoreResult<ImportLeadsResponse>> {
+      return withStoreOperation(operation, async (activeOperation) => {
+        const snapshot = await loadMetadataSnapshot(activeOperation);
+        if (!isUserAllowed(snapshot, user)) {
+          return { allowed: false };
+        }
+        return {
+          allowed: true,
+          value: await importLeads(user, snapshot, activeOperation, payload)
         };
       });
     },

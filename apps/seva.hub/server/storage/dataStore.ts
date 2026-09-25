@@ -4,6 +4,7 @@ import {
   type Course,
   type CreateCourseResponse,
   type CreateLeadResponse,
+  type ImportLeadsResponse,
   type DeleteCourseResponse,
   type DeleteLeadResponse,
   type ListCoursesResponse,
@@ -42,6 +43,11 @@ export type ApiDataStore = {
     payload: unknown,
     operation?: SheetsOperation
   ) => Promise<AuthorizedStoreResult<CreateLeadResponse>>;
+  importLeadsForAuthorizedUser: (
+    user: SessionUser,
+    payload: unknown,
+    operation?: SheetsOperation
+  ) => Promise<AuthorizedStoreResult<ImportLeadsResponse>>;
   updateLeadForAuthorizedUser: (
     user: SessionUser,
     payload: unknown,
