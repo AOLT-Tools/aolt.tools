@@ -10,6 +10,7 @@ From the repository root:
 
 ```sh
 pnpm install
+pnpm build:packages
 pnpm dev:aol.guide
 pnpm build:aol.guide
 pnpm --dir apps/aol.guide test

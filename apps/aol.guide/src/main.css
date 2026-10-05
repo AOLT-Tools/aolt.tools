@@ -1,6 +1,85 @@
 @import 'tailwindcss';
 
+@layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
 @layer components {
+  .app-main {
+    padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+  }
+
+  .tab-panel:focus {
+    outline: none;
+  }
+
+  .tab-panel[hidden] {
+    display: none !important;
+  }
+
+  .chat-tab-panel {
+    box-sizing: border-box;
+    display: flex;
+    height: calc(
+      100dvh - 3.5rem - 5.75rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    flex-direction: column;
+    padding-top: 1rem;
+  }
+
+  .chat-surface {
+    min-height: 0;
+    flex: 1;
+  }
+
+  .chat-agent {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .bottom-tabs {
+    @apply fixed right-0 bottom-0 left-0 z-40 border-t border-slate-100 bg-white;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-tabs-inner {
+    @apply mx-auto flex w-full max-w-[430px] justify-center;
+  }
+
+  .bottom-tab {
+    @apply relative mx-auto inline-flex min-h-14 flex-1 cursor-pointer items-center justify-center gap-1.5 border-0 bg-transparent px-4 pt-1 text-[13px] font-bold text-slate-500;
+    max-width: 13.4375rem;
+    transition:
+      color 180ms ease,
+      background-color 180ms ease;
+  }
+
+  .bottom-tab-icon {
+    @apply h-5 w-5 shrink-0;
+  }
+
+  .bottom-tab[aria-selected='true'] {
+    @apply text-[#1b3a6e];
+  }
+
+  .bottom-tab:active {
+    @apply bg-slate-50;
+  }
+
+  .bottom-tab:focus-visible {
+    outline: 2px solid #1b3a6e;
+    outline-offset: -0.5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bottom-tab {
+      transition: none;
+    }
+  }
+
   .sync-pill {
     @apply inline-flex min-h-7 items-center rounded-full bg-slate-100 px-2.5 text-[11px] font-semibold text-slate-600;
   }

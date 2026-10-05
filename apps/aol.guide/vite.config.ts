@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 const appDir = import.meta.dirname;
 const repoDir = resolve(appDir, '../..');
+const localAgentEmbedDistDir = resolve(repoDir, '../pd/agent-embed/js/dist');
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, appDir, '');
@@ -32,7 +33,7 @@ export default defineConfig(({ mode }) => {
   ],
   server: {
     fs: {
-      allow: [repoDir]
+      allow: [repoDir, localAgentEmbedDistDir]
     }
   },
   build: {

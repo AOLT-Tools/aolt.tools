@@ -22,9 +22,9 @@ describe('production Mapbox CSP', () => {
   const csp = header('Content-Security-Policy');
 
   it('lets Temporary Geocoding call Mapbox without loading a third-party script', () => {
-    expect(csp).toContain("connect-src 'self' https://api.mapbox.com https://events.mapbox.com");
+    expect(csp).toContain("connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://app.predictabledialogs.com");
     expect(csp).toContain('worker-src blob:');
     expect(csp).toContain('blob:');
-    expect(csp).toMatch(/script-src 'self'(;|$)/);
+    expect(csp).toContain("script-src 'self' https://cdn.jsdelivr.net");
   });
 });

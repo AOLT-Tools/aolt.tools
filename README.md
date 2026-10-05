@@ -17,6 +17,7 @@ The repository root is **not a Vercel application**. It contains workspace tooli
 
 ```bash
 pnpm install
+pnpm build:packages
 pnpm run dev:aol.guide
 pnpm run dev:seva.hub
 ```

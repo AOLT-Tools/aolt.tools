@@ -18,7 +18,6 @@
   </head>
   <body
     class="min-h-dvh bg-white text-slate-900 antialiased"
-    style="padding-bottom: env(safe-area-inset-bottom)"
   >
     <header
       class="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur-xl"
@@ -51,7 +50,15 @@
       </div>
     </header>
 
-    <main class="mx-auto w-full max-w-[430px] px-4 pb-10">
+    <main class="app-main mx-auto w-full max-w-[430px] px-4">
+      <section
+        class="tab-panel"
+        id="tab-panel-search"
+        role="tabpanel"
+        aria-labelledby="tab-search"
+        data-tab-panel="search"
+        tabindex="0"
+      >
       <section class="pt-4" aria-label="Search">
         <div class="filter-bar">
           <div
@@ -233,7 +240,81 @@
       <section class="mt-4" aria-live="polite">
         <div class="grid gap-2.5" id="results"></div>
       </section>
+      </section>
+
+      <section
+        class="tab-panel chat-tab-panel"
+        id="tab-panel-chat"
+        role="tabpanel"
+        aria-labelledby="tab-chat"
+        data-tab-panel="chat"
+        tabindex="0"
+        hidden
+      >
+        <div class="chat-surface" id="chat-root" aria-label="Chat">
+          <agent-standard class="chat-agent"></agent-standard>
+        </div>
+      </section>
     </main>
+
+    <nav class="bottom-tabs" aria-label="Primary">
+      <div class="bottom-tabs-inner" role="tablist" aria-label="AOL Guide destinations">
+        <button
+          type="button"
+          class="bottom-tab"
+          id="tab-search"
+          role="tab"
+          aria-selected="true"
+          aria-controls="tab-panel-search"
+          data-tab="search"
+        >
+          <svg
+            class="bottom-tab-icon"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          <span>Search</span>
+        </button>
+        <button
+          type="button"
+          class="bottom-tab"
+          id="tab-chat"
+          role="tab"
+          aria-selected="false"
+          aria-controls="tab-panel-chat"
+          data-tab="chat"
+          tabindex="-1"
+        >
+          <svg
+            class="bottom-tab-icon"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path
+              d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+            ></path>
+          </svg>
+          <span>Chat</span>
+        </button>
+      </div>
+    </nav>
 
     <script type="module" src="/search.ts"></script>
   </body>

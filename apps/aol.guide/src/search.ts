@@ -25,16 +25,14 @@ import {
   type OnlineTimePreset
 } from '../lib/dateRanges.js';
 import type { OfficialCourseListing } from '../lib/searchIntent.js';
-import {
-  LOCATION_SUGGEST_DEBOUNCE_MS,
-  shouldSuggestLocationQuery,
-  suggestMapboxTemporaryLocations,
-  type BrowserLocation
-} from './mapboxSearchJs.js';
+import type { BrowserLocation } from './mapboxSearchJs.js';
+import { initAolGuideChatAgent } from './chatWidget.js';
+import { mountLocationPicker } from './locationPicker.js';
 
 type SearchSource = 'aol' | 'center' | 'vvmvp' | 'vds';
 type SearchMode = 'in_person' | 'online';
 type TimePreset = OnlineTimePreset;
+type GuideTab = 'search' | 'chat';
 
 type SourceSearchResult = {
   source: string;
@@ -99,6 +97,12 @@ const timeCustomPanel = document.querySelector<HTMLElement>('#time-custom-panel'
 const dateFromInput = document.querySelector<HTMLInputElement>('#date-from');
 const dateToInput = document.querySelector<HTMLInputElement>('#date-to');
 const categoryChips = document.querySelector<HTMLElement>('#category-chips');
+const primaryTabButtons = Array.from(
+  document.querySelectorAll<HTMLButtonElement>('[data-tab]')
+);
+const primaryTabPanels = Array.from(
+  document.querySelectorAll<HTMLElement>('[data-tab-panel]')
+);
 
 let currentSource: SearchSource = readStoredSource();
 let currentMode: SearchMode = readStoredMode();
@@ -119,6 +123,8 @@ let searchAbort: AbortController | null = null;
 initializeSearchPage();
 
 function initializeSearchPage() {
+  initializePrimaryTabs();
+
   if (!results || !statusPill) return;
 
   setStatus('');
@@ -240,6 +246,107 @@ function initializeSearchPage() {
     persistCategories();
     renderCategoryChips();
     renderMergedResults();
+  });
+}
+
+function initializePrimaryTabs() {
+  if (!primaryTabButtons.length || !primaryTabPanels.length) return;
+  selectPrimaryTab(guideTabFromHash());
+
+  window.addEventListener('hashchange', () => {
+    selectPrimaryTab(guideTabFromHash());
+  });
+
+  for (const button of primaryTabButtons) {
+    button.addEventListener('click', () => {
+      const tab = parseGuideTab(button.dataset.tab);
+      if (!tab) return;
+      activatePrimaryTab(tab);
+    });
+    button.addEventListener('keydown', onPrimaryTabKeydown);
+  }
+}
+
+function onPrimaryTabKeydown(event: KeyboardEvent) {
+  const button =
+    event.currentTarget instanceof HTMLButtonElement ? event.currentTarget : null;
+  if (!button) return;
+  const currentIndex = primaryTabButtons.indexOf(button);
+  if (currentIndex < 0) return;
+
+  let nextIndex: number | undefined;
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    nextIndex = (currentIndex + 1) % primaryTabButtons.length;
+  } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    nextIndex =
+      (currentIndex - 1 + primaryTabButtons.length) % primaryTabButtons.length;
+  } else if (event.key === 'Home') {
+    nextIndex = 0;
+  } else if (event.key === 'End') {
+    nextIndex = primaryTabButtons.length - 1;
+  }
+
+  if (nextIndex === undefined) return;
+  event.preventDefault();
+  const nextTab = parseGuideTab(primaryTabButtons[nextIndex]?.dataset.tab);
+  if (!nextTab) return;
+  activatePrimaryTab(nextTab, { focusTab: true });
+}
+
+function activatePrimaryTab(tab: GuideTab, options: { focusTab?: boolean } = {}) {
+  selectPrimaryTab(tab, options);
+  updateGuideTabHash(tab);
+}
+
+function selectPrimaryTab(tab: GuideTab, options: { focusTab?: boolean } = {}) {
+  if (currentPrimaryTab() !== tab) {
+    closeProgramDialog();
+    closeTimeRangeDialog();
+  }
+
+  for (const button of primaryTabButtons) {
+    const active = parseGuideTab(button.dataset.tab) === tab;
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+    if (active && options.focusTab) button.focus();
+  }
+
+  for (const panel of primaryTabPanels) {
+    const active = parseGuideTab(panel.dataset.tabPanel) === tab;
+    panel.hidden = !active;
+    panel.setAttribute('aria-hidden', String(!active));
+  }
+
+  if (tab === 'chat') {
+    void ensureChatAgentLoaded();
+  }
+}
+
+function currentPrimaryTab(): GuideTab | undefined {
+  const selected = primaryTabButtons.find(
+    (button) => button.getAttribute('aria-selected') === 'true'
+  );
+  return selected ? parseGuideTab(selected.dataset.tab) : undefined;
+}
+
+function parseGuideTab(value: string | undefined): GuideTab | undefined {
+  return value === 'search' || value === 'chat' ? value : undefined;
+}
+
+function guideTabFromHash(): GuideTab {
+  return parseGuideTab(window.location.hash.slice(1).toLowerCase()) ?? 'search';
+}
+
+function updateGuideTabHash(tab: GuideTab) {
+  const nextHash = '#' + tab;
+  if (window.location.hash === nextHash) return;
+  window.location.hash = nextHash;
+}
+
+function ensureChatAgentLoaded(): Promise<void> {
+  return initAolGuideChatAgent({
+    mapboxToken: (import.meta.env.AOL_GUIDE_MAPBOX_TOKEN || '').trim(),
+    renderListingCard: renderListingCardView
   });
 }
 
@@ -731,9 +838,31 @@ function moreResultsLink(url: string): HTMLAnchorElement {
 }
 
 function renderListingCard(item: OfficialCourseListing): HTMLElement {
+  const online =
+    currentSource !== 'center' && (currentMode === 'online' || item.isOnline);
+  return renderListingCardView(item, {
+    online,
+    showOnlineBadge: online && !usesOnlineSearch(),
+    actionLabel: currentSource === 'center' ? 'More Info' : 'Register',
+    includeLocation: !online,
+    includeDistance: !online
+  });
+}
+
+type ListingCardViewOptions = {
+  online: boolean;
+  showOnlineBadge: boolean;
+  actionLabel: string;
+  includeLocation: boolean;
+  includeDistance: boolean;
+};
+
+function renderListingCardView(
+  item: OfficialCourseListing,
+  options: ListingCardViewOptions
+): HTMLElement {
   const card = document.createElement('article');
   card.className = 'result-card';
-  const online = currentSource !== 'center' && (currentMode === 'online' || item.isOnline);
 
   const header = document.createElement('header');
   header.className = 'result-card-header';
@@ -742,7 +871,7 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const title = document.createElement('h2');
   title.textContent = item.title;
   heading.append(title);
-  if (online && !usesOnlineSearch()) {
+  if (options.showOnlineBadge) {
     const labels = document.createElement('div');
     labels.className = 'result-card-labels';
     const badge = document.createElement('span');
@@ -757,8 +886,7 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   if (url) {
     const register = document.createElement('span');
     register.className = 'register-affordance';
-    register.textContent =
-      currentSource === 'center' ? 'More Info' : 'Register';
+    register.textContent = options.actionLabel;
     header.append(register);
     makeCardClickable(card, url);
   }
@@ -766,14 +894,16 @@ function renderListingCard(item: OfficialCourseListing): HTMLElement {
   const meta = document.createElement('div');
   meta.className = 'result-meta';
   appendMetaRow(meta, 'calendar', item.schedule);
-  if (!online) appendMetaRow(meta, 'location', item.location);
+  if (options.includeLocation) appendMetaRow(meta, 'location', item.location);
 
   const secondary = document.createElement('div');
   secondary.className = 'result-meta-secondary';
-  const secondaryParts = online
+  const secondaryParts = options.online
     ? [item.languages.join(', '), item.fee]
     : [
-        typeof item.distanceKm === 'number' ? item.distanceKm.toFixed(1) + ' km' : '',
+        options.includeDistance && typeof item.distanceKm === 'number'
+          ? item.distanceKm.toFixed(1) + ' km'
+          : '',
         item.languages.join(', '),
         item.fee
       ];
@@ -1078,160 +1208,34 @@ function setStatus(label: string, state: 'idle' | 'loading' | 'error' = 'idle') 
   statusPill.dataset.state = state;
 }
 
-async function mountLocationSearch() {
+function mountLocationSearch() {
   if (!locationHost) return;
-  const token = (import.meta.env.AOL_GUIDE_MAPBOX_TOKEN || '').trim();
   const input = locationHost.querySelector<HTMLInputElement>('#location-input');
   const suggestionList = locationHost.querySelector<HTMLElement>(
     '#location-suggestions'
   );
   if (!input || !suggestionList) return;
-  if (!token.startsWith('pk.')) {
-    input.placeholder = 'Mapbox token missing';
-    return;
-  }
 
-  input.disabled = false;
-  let debounceTimer = 0;
-  let suggestAbort: AbortController | null = null;
-  let highlightIndex = -1;
-
-  const hideSuggestions = () => {
-    suggestionList.hidden = true;
-    suggestionList.replaceChildren();
-    highlightIndex = -1;
-  };
-
-  const clearLocation = () => {
-    suggestAbort?.abort();
-    window.clearTimeout(debounceTimer);
-    selectedLocation = undefined;
-    input.value = '';
-    hideSuggestions();
-    searchAbort?.abort();
-    searchRequestId += 1;
-    resetListings();
-    showLocationIdle();
-  };
-
-  const chooseSuggestion = (location: BrowserLocation) => {
-    suggestAbort?.abort();
-    window.clearTimeout(debounceTimer);
-    selectedLocation = location;
-    input.value = location.label;
-    hideSuggestions();
-    resetListings();
-    void runCatalogSearch();
-  };
-
-  const renderSuggestions = (locations: BrowserLocation[]) => {
-    suggestionList.replaceChildren();
-    if (!locations.length) {
-      hideSuggestions();
-      return;
-    }
-    locations.forEach((location, index) => {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'suggestion-option';
-      option.setAttribute('role', 'option');
-      option.dataset.index = String(index);
-      option.textContent = location.label;
-      option.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        chooseSuggestion(location);
-      });
-      suggestionList.append(option);
-    });
-    suggestionList.hidden = false;
-    highlightIndex = -1;
-  };
-
-  const requestSuggestions = async (query: string) => {
-    suggestAbort?.abort();
-    if (!shouldSuggestLocationQuery(query)) {
-      hideSuggestions();
-      return;
-    }
-    const controller = new AbortController();
-    suggestAbort = controller;
-    try {
-      const locations = await suggestMapboxTemporaryLocations(query, token, {
-        signal: controller.signal
-      });
-      if (controller.signal.aborted || input.value.trim() !== query.trim()) {
-        return;
-      }
-      renderSuggestions(locations);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      console.error('Mapbox temporary geocode failed', error);
-      hideSuggestions();
-    }
-  };
-
-  input.addEventListener('input', () => {
-    const query = input.value;
-    if (!query.trim()) {
-      clearLocation();
-      return;
-    }
-    if (selectedLocation && query.trim() !== selectedLocation.label) {
+  mountLocationPicker({
+    host: locationHost,
+    input,
+    suggestionList,
+    token: (import.meta.env.AOL_GUIDE_MAPBOX_TOKEN || '').trim(),
+    onSelect: (location) => {
+      selectedLocation = location;
+      resetListings();
+      void runCatalogSearch();
+    },
+    onEdit: () => {
       selectedLocation = undefined;
+    },
+    onClear: () => {
+      selectedLocation = undefined;
+      searchAbort?.abort();
+      searchRequestId += 1;
+      resetListings();
+      showLocationIdle();
     }
-    window.clearTimeout(debounceTimer);
-    if (!shouldSuggestLocationQuery(query)) {
-      hideSuggestions();
-      return;
-    }
-    debounceTimer = window.setTimeout(() => {
-      void requestSuggestions(query);
-    }, LOCATION_SUGGEST_DEBOUNCE_MS);
-  });
-
-  input.addEventListener('keydown', (event) => {
-    const options = [
-      ...suggestionList.querySelectorAll<HTMLButtonElement>('.suggestion-option')
-    ];
-    if (event.key === 'Escape') {
-      hideSuggestions();
-      return;
-    }
-    if (!options.length || suggestionList.hidden) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      highlightIndex = (highlightIndex + 1) % options.length;
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      highlightIndex = (highlightIndex - 1 + options.length) % options.length;
-    } else if (event.key === 'Enter' && highlightIndex >= 0) {
-      event.preventDefault();
-      options[highlightIndex]?.dispatchEvent(new Event('mousedown'));
-      return;
-    } else {
-      return;
-    }
-    options.forEach((option, index) => {
-      option.setAttribute(
-        'aria-selected',
-        index === highlightIndex ? 'true' : 'false'
-      );
-    });
-  });
-
-  input.addEventListener('blur', () => {
-    window.setTimeout(hideSuggestions, 120);
-  });
-
-  input.addEventListener('search', () => {
-    if (!input.value.trim()) clearLocation();
-  });
-
-  document.addEventListener('click', (event) => {
-    if (event.target instanceof Node && locationHost.contains(event.target)) {
-      return;
-    }
-    hideSuggestions();
   });
 }
 
