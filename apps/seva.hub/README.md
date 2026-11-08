@@ -239,6 +239,7 @@ After deployment, test:
 ```text
 https://YOUR-DOMAIN/
 https://YOUR-DOMAIN/seva
+https://YOUR-DOMAIN/seva/add-lead
 https://YOUR-DOMAIN/courses
 https://YOUR-DOMAIN/go/sample
 ```
@@ -334,3 +335,9 @@ BLOB_READ_WRITE_TOKEN
 Public Blob store access
 Blob store connected to the Vercel environment being tested
 ```
+
+## Lead workspace enhancements
+
+See [Lead sorting and direct entry](docs/lead-workspace.md) for the direct Add Lead
+URL, fast loading, sorting, clipboard summaries, creation timestamps, and transfer
+notes.

@@ -22,7 +22,8 @@ const leadHeaders = Object.freeze([
   'assignedVolunteerEmail',
   'wishlistPrograms',
   'donePrograms',
-  'mobile'
+  'mobile',
+  'createdAt'
 ]);
 
 export const SHEET_HEADERS = Object.freeze({

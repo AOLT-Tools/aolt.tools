@@ -87,8 +87,8 @@ export const appRuntime = {
   async signOut() {
     return (await getAuthProvider()).signOut();
   },
-  async loadBootstrap(campaignId?: string | null) {
-    return (await getLeadRepository()).getBootstrap(campaignId);
+  async loadBootstrap(campaignId?: string | null, metadataOnly = false) {
+    return (await getLeadRepository()).getBootstrap(campaignId, metadataOnly);
   },
   async assignMembers(payload: AssignMembersRequest) {
     return (await getLeadRepository()).assignMembers(payload);

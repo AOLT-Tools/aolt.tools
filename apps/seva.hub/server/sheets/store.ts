@@ -1,3 +1,5 @@
+import { ensureCreatedAtColumn } from '../leads/createdAt.js';
+import { withVolunteerTransferNote } from '../../shared/leadTransfer.js';
 import {
   ALL_LEADS_SCOPE_ID,
   AssignMembersRequestSchema,
@@ -188,6 +190,7 @@ type LeadColumnMap = {
   quality: number;
   followUp: number;
   lastUpdated: number;
+  createdAt: number;
   status: number;
   notes: number;
   campaignId: number;
@@ -299,6 +302,7 @@ function resolveLeadColumns(headers: string[]): LeadColumnMap {
     quality: findHeaderIndex(headers, ['quality']),
     followUp: findHeaderIndex(headers, ['followUp']),
     lastUpdated: findHeaderIndex(headers, ['lastUpdated']),
+    createdAt: findHeaderIndex(headers, ['createdAt']),
     status: findHeaderIndex(headers, ['status']),
     notes: findHeaderIndex(headers, ['notes']),
     campaignId: findHeaderIndex(headers, CAMPAIGN_ID_HEADERS),
@@ -498,6 +502,7 @@ function mapRowToLead(
     quality: getCell(row, columns.quality),
     followUp: getCell(row, columns.followUp),
     lastUpdated: getCell(row, columns.lastUpdated),
+    createdAt: getCell(row, columns.createdAt),
     status: getCell(row, columns.status),
     notes: getCell(row, columns.notes),
     campaignId: getCell(row, columns.campaignId) || selectedCampaign.id,
@@ -668,8 +673,20 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     user: SessionUser,
     snapshot: MetadataSnapshot,
     operation: SheetsOperation,
-    campaignId?: string | null
+    campaignId?: string | null,
+    metadataOnly = false
   ): Promise<BootstrapResponse> {
+    if (metadataOnly) {
+      const campaign = isAllLeadsScope(campaignId)
+        ? null
+        : selectCampaign(snapshot, campaignId);
+      return toBootstrapResponse(
+        user,
+        snapshot,
+        campaign?.id || ALL_LEADS_SCOPE_ID,
+        []
+      );
+    }
     if (isAllLeadsScope(campaignId)) {
       return getAllAssignedLeads(user, snapshot, operation);
     }
@@ -877,7 +894,18 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     setUpdate(columns.status, payload.status);
     setUpdate(columns.quality, payload.quality);
     setUpdate(columns.followUp, payload.followUp);
-    setUpdate(columns.notes, payload.notes);
+    setUpdate(
+      columns.notes,
+      targetVolunteerEmail && targetVolunteerEmail !== assignedVolunteerEmail
+        ? withVolunteerTransferNote(
+            payload.notes ?? getCell(target.values, columns.notes),
+            assignedVolunteerEmail,
+            targetVolunteerEmail,
+            snapshot.volunteers,
+            timestamp
+          )
+        : payload.notes
+    );
     setUpdate(columns.assignedVolunteerEmail, targetVolunteerEmail);
     setUpdate(
       columns.wishlistPrograms,
@@ -929,6 +957,9 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       throw new Error('Lead sheet must contain id and campaignId columns.');
     }
 
+    columns.createdAt = await ensureCreatedAtColumn(headers, baseRange, (updates) =>
+      updateSheetValuesBatch('data', updates, operation)
+    );
     const timestamp = now().toISOString();
     const id = nanoid();
     const row = Array<string>(headers.length).fill('');
@@ -940,9 +971,14 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     setCell(columns.id, id);
     setCell(columns.mobile, payload.mobile);
     setCell(columns.name, payload.name);
-    setCell(columns.quality, campaign.type === 'Members' ? 'Engagement' : 'Quality');
+    setCell(
+      columns.quality,
+      payload.quality || (campaign.type === 'Members' ? 'Engagement' : 'Quality')
+    );
     setCell(columns.followUp, 'Follow-up');
     setCell(columns.lastUpdated, timestamp);
+    setCell(columns.createdAt, timestamp);
+    setCell(columns.wishlistPrograms, toCsv(payload.wishlistPrograms));
     setCell(columns.status, 'Response');
     setCell(columns.notes, payload.notes || '');
     setCell(columns.campaignId, campaign.id);
@@ -955,21 +991,26 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       id,
       mobile: payload.mobile,
       name: payload.name,
-      quality: campaign.type === 'Members' ? 'Engagement' : 'Quality',
+      quality:
+        payload.quality || (campaign.type === 'Members' ? 'Engagement' : 'Quality'),
       followUp: 'Follow-up',
       lastUpdated: timestamp,
+      createdAt: timestamp,
       status: 'Response',
       notes: payload.notes || '',
       campaignId: campaign.id,
       campaignType: campaign.type,
       assignedVolunteerEmail: normalizeEmail(user.email),
-      wishlistPrograms: '',
+      wishlistPrograms: toCsv(payload.wishlistPrograms),
       donePrograms: ''
     });
     return CreateLeadResponseSchema.parse({ success: true, lead });
   }
 
-  function readImportBatch(rawPayload: unknown): { campaignId: string; rows: string[][] } {
+  function readImportBatch(rawPayload: unknown): {
+    campaignId: string;
+    rows: string[][];
+  } {
     const record =
       typeof rawPayload === 'object' && rawPayload && !Array.isArray(rawPayload)
         ? (rawPayload as Record<string, unknown>)
@@ -996,7 +1037,9 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     if (payload.rows.length > MAX_IMPORT_ROWS + 1) {
       throw new LeadImportError('SHEET_TOO_LARGE', sheetTooLargeMessage());
     }
-    const campaign = snapshot.config.campaigns.find((item) => item.id === payload.campaignId);
+    const campaign = snapshot.config.campaigns.find(
+      (item) => item.id === payload.campaignId
+    );
     if (!campaign) {
       throw new Error('CAMPAIGN_NOT_FOUND');
     }
@@ -1036,6 +1079,12 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       });
     }
 
+    if (plan.leads.length)
+      columns.createdAt = await ensureCreatedAtColumn(
+        headers,
+        layout.leadsRange,
+        (updates) => updateSheetValuesBatch('data', updates, operation)
+      );
     const timestamp = now().toISOString();
     const assignee = normalizeEmail(user.email);
     const leads: Lead[] = [];
@@ -1054,6 +1103,7 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       setCell(columns.quality, 'Quality');
       setCell(columns.followUp, 'Follow-up');
       setCell(columns.lastUpdated, timestamp);
+      setCell(columns.createdAt, timestamp);
       setCell(columns.status, 'Response');
       setCell(columns.notes, item.notes);
       setCell(columns.campaignId, campaign.id);
@@ -1068,6 +1118,7 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
           quality: 'Quality',
           followUp: 'Follow-up',
           lastUpdated: timestamp,
+          createdAt: timestamp,
           status: 'Response',
           notes: item.notes,
           campaignId: campaign.id,
@@ -1423,7 +1474,8 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     async getBootstrapForAuthorizedUser(
       user: SessionUser,
       campaignId?: string | null,
-      operation?: SheetsOperation
+      operation?: SheetsOperation,
+      metadataOnly = false
     ): Promise<AuthorizedStoreResult<BootstrapResponse>> {
       return withStoreOperation(operation, async (activeOperation) => {
         const snapshot = await loadMetadataSnapshot(activeOperation);
@@ -1432,7 +1484,13 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
         }
         return {
           allowed: true,
-          value: await getBootstrap(user, snapshot, activeOperation, campaignId)
+          value: await getBootstrap(
+            user,
+            snapshot,
+            activeOperation,
+            campaignId,
+            metadataOnly
+          )
         };
       });
     },

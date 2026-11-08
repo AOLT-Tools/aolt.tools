@@ -84,6 +84,7 @@ export const LeadSchema = z.object({
   quality: z.string().default('Quality'),
   followUp: z.string().default('Follow-up'),
   lastUpdated: z.string().default('Just now'),
+  createdAt: z.string().optional(),
   status: z.string().default('Response'),
   notes: z.string().default(''),
   campaignId: z.string().optional(),
@@ -155,6 +156,8 @@ export const CreateLeadRequestSchema = z.object({
     })
     .transform((value) => normalizeIndianMobile(value)),
   notes: z.string().optional(),
+  quality: z.string().trim().min(1).optional(),
+  wishlistPrograms: z.string().optional(),
   campaignId: NanoIdSchema,
   campaignType: z.enum(['Leads', 'Members'])
 });

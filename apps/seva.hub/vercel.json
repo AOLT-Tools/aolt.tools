@@ -3,6 +3,8 @@
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/seva/add-lead", "destination": "/seva.html" },
+    { "source": "/seva/add-lead/", "destination": "/seva.html" },
     {
       "source": "/seva",
       "destination": "/seva.html"

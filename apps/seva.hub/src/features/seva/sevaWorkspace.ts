@@ -1,3 +1,4 @@
+import { createSortingMethods } from './sorting';
 import { createSevaWorkspaceInitialState } from './state';
 import { createAuthAndBootstrapMethods } from './authAndBootstrap';
 import { createLeadLifecycleMethods } from './leadLifecycle';
@@ -138,6 +139,7 @@ export function sevaWorkspace(): SevaWorkspaceContext {
     ...createLeadLifecycleMethods(),
     ...createProgramMethods(),
     ...createDateAndFilterMethods(),
+    ...createSortingMethods(),
     ...createUiMethods(),
     ...createRecordActionMethods(),
     ...createCommunicationMethods(),

@@ -172,12 +172,15 @@ export function createProgramMethods() {
     getLeadProgramAfter(this: SevaWorkspaceContext, lead: Lead): string {
       return this.leadProgramParts(lead).after;
     },
-    leadProgramParts(this: SevaWorkspaceContext, lead: Lead): {
+    leadProgramParts(
+      this: SevaWorkspaceContext,
+      lead: Lead
+    ): {
       course: string;
       month: string;
       after: string;
     } {
-      const summary = lead.programSummary || this.getProgramSummary(lead);
+      const summary: string = lead.programSummary || this.getProgramSummary(lead);
       const month = this.isAllLeadsView()
         ? leadCampaignMonthShort(this.getLeadCampaignName(lead))
         : '';
@@ -214,24 +217,48 @@ export function createProgramMethods() {
       }
       return this.appConfig.showDonePrograms !== false;
     },
-    openProgramEditor(this: SevaWorkspaceContext, lead: Lead): void {
-      if (!this.shouldShowProgramEditor()) {
+    openProgramEditor(this: SevaWorkspaceContext, lead?: Lead): void {
+      if (
+        !this.shouldShowProgramEditor() ||
+        (!lead &&
+          (!this.isCreateRecordModalOpen ||
+            this.createRecordType !== 'Leads' ||
+            this.isCreateRecordSaving))
+      ) {
         return;
       }
-      this.activateCard(lead);
-      this.activeProgramLead = lead;
+      if (lead) {
+        this.activateCard(lead);
+      }
+      this.programEditorTarget = lead ? 'lead' : 'createRecord';
+      this.activeProgramLead = lead || null;
       this.programDraft = {
-        wishlist: this.normalizePrograms(lead.wishlistPrograms),
-        done: this.normalizePrograms(lead.donePrograms)
+        wishlist: this.normalizePrograms(
+          lead ? lead.wishlistPrograms : this.createRecordDraft.wishlistPrograms
+        ),
+        done: lead ? this.normalizePrograms(lead.donePrograms) : []
       };
       this.isProgramEditorOpen = true;
+      this.$nextTick?.(() => this.$refs?.programEditor?.focus());
     },
     closeProgramEditor(this: SevaWorkspaceContext): void {
+      const editingCreateRecord = this.programEditorTarget === 'createRecord';
       this.isProgramEditorOpen = false;
+      this.programEditorTarget = 'lead';
       this.activeProgramLead = null;
       this.programDraft = { wishlist: [], done: [] };
+      if (editingCreateRecord) {
+        this.$nextTick?.(() => this.$refs?.createRecordPrograms?.focus());
+      }
     },
     applyProgramEditor(this: SevaWorkspaceContext): void {
+      if (this.programEditorTarget === 'createRecord') {
+        this.createRecordDraft.wishlistPrograms = this.normalizePrograms(
+          this.programDraft.wishlist
+        );
+        this.closeProgramEditor();
+        return;
+      }
       if (!this.activeProgramLead) {
         this.closeProgramEditor();
         return;

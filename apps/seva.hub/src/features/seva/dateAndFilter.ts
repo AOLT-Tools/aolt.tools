@@ -1,3 +1,4 @@
+import { sortLeads } from './sorting';
 import type { SevaWorkspaceContext, Lead } from './types';
 
 type FilterCache = {
@@ -20,6 +21,9 @@ function buildLeadFilterDataKey(leads: Lead[]): string {
     .map((lead) =>
       [
         lead.id,
+        lead.createdAt,
+        lead.lastSavedAt ?? lead.lastUpdated,
+        lead._originalData?.name,
         lead.quality,
         lead.status,
         lead._nameLower,
@@ -218,6 +222,7 @@ export function createDateAndFilterMethods() {
         this.metricFilter,
         searchTerm,
         this.programFilter,
+        this.leadSort,
         String(todayTs)
       ].join('|');
 
@@ -242,7 +247,7 @@ export function createDateAndFilterMethods() {
 
       let dueCount = 0;
       let upcomingCount = 0;
-      const filtered = (this.leads || []).filter((lead: Lead) => {
+      const matching = (this.leads || []).filter((lead: Lead) => {
         const followUpTs = lead._followUpTs;
 
         if (followUpTs !== null && followUpTs <= todayTs) {
@@ -300,6 +305,7 @@ export function createDateAndFilterMethods() {
         return modeMatch && metricMatch && matchesSearch && programMatch2;
       });
 
+      const filtered = sortLeads(matching, this.leadSort);
       this.dueFollowUpCount = dueCount;
       this.upcomingFollowUpCount = upcomingCount;
       filterCacheByContext.set(this, {

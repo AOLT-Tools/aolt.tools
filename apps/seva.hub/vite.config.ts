@@ -117,7 +117,7 @@ function sevaHubRewritePlugin() {
     const pathname = queryIndex >= 0 ? url.slice(0, queryIndex) : url;
     const query = queryIndex >= 0 ? url.slice(queryIndex) : '';
 
-    if (pathname === '/seva' || pathname === '/seva/') {
+    if (['/seva', '/seva/', '/seva/add-lead', '/seva/add-lead/'].includes(pathname)) {
       return `/seva.html${query}`;
     }
     if (pathname === '/privacy' || pathname === '/privacy/') {

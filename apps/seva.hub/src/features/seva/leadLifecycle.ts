@@ -82,6 +82,7 @@ async function drainLeadSaveQueue(
       if (!queue.pending) {
         request.lead._originalData = cloneSnapshot(request.snapshot);
         request.lead.lastUpdated = lastUpdated || 'Just now';
+        request.lead.lastSavedAt = lastUpdated || request.lead.lastSavedAt;
         request.lead.isDirty = !snapshotsMatch(
           context.createLeadSnapshot(request.lead),
           request.snapshot
@@ -293,6 +294,8 @@ export function createLeadLifecycleMethods() {
         quality: '',
         followUp: String(lead.followUp || ''),
         lastUpdated: String(lead.lastUpdated || 'Just now'),
+        lastSavedAt: String(lead.lastUpdated || ''),
+        createdAt: String(lead.createdAt || ''),
         status: '',
         notes: String(lead.notes || ''),
         campaignId: String(lead.campaignId || this.selectedCampaignId),

@@ -1,6 +1,7 @@
 import Alpine from '@alpinejs/csp';
 import { appRuntime } from './services/appRuntime';
 import {
+  ArrowDownUp,
   Calendar,
   Download,
   ExternalLink,
@@ -39,6 +40,7 @@ async function bootstrap() {
   Alpine.data('sevaWorkspace', sevaWorkspace);
   createIcons({
     icons: {
+      ArrowDownUp,
       Calendar,
       Download,
       ExternalLink,

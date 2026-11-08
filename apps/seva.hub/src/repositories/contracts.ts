@@ -27,7 +27,10 @@ export interface AuthProvider {
 }
 
 export interface LeadRepository {
-  getBootstrap(campaignId?: string | null): Promise<BootstrapResponse>;
+  getBootstrap(
+    campaignId?: string | null,
+    metadataOnly?: boolean
+  ): Promise<BootstrapResponse>;
   assignMembers(payload: AssignMembersRequest): Promise<AssignMembersResponse>;
   createLead(payload: CreateLeadRequest): Promise<CreateLeadResponse>;
   importLeads(payload: ImportLeadsRequest): Promise<ImportLeadsResponse>;

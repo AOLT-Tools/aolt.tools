@@ -36,7 +36,7 @@
         height: 0.875rem;
       }
     </style>
-    <script type="module" src="./main.ts"></script>
+    <script type="module" src="/main.ts"></script>
   </head>
   <body
     class="bg-slate-100 text-slate-800 font-sans antialiased max-w-md mx-auto min-h-screen flex flex-col"
@@ -170,7 +170,7 @@
 
       <main class="px-4 pt-4 pb-28 space-y-4 flex-1 relative">
         <div
-          x-show="isLoadingBootstrap || isCampaignSwitching"
+          x-show="(isLoadingBootstrap || isCampaignSwitching) && !isCreateRecordModalOpen"
           x-transition.opacity
           class="absolute inset-0 z-20 bg-white/70 backdrop-blur-[1px] flex items-center justify-center rounded-xl"
         >
@@ -188,7 +188,7 @@
 
         <section
           x-cloak
-          x-show="isVolunteerModalOpen"
+          x-show="isVolunteerModalOpen && !isCreateRecordModalOpen"
           class="min-h-[calc(100vh-2rem)] flex items-center justify-center py-8"
           aria-labelledby="seva-login-title"
         >
@@ -280,13 +280,13 @@
 
         <div
           x-cloak
-          x-show="!isVolunteerModalOpen"
-          :inert="isLoadingBootstrap || isCampaignSwitching"
-          :aria-busy="isLoadingBootstrap || isCampaignSwitching"
+          x-show="!isVolunteerModalOpen || (isAddLeadRoute && isCreateRecordModalOpen)"
+          :inert="(isLoadingBootstrap || isCampaignSwitching) && !isCreateRecordModalOpen"
+          :aria-busy="(isLoadingBootstrap || isCampaignSwitching) && !isCreateRecordModalOpen"
           class="space-y-4"
         >
           <div
-            x-show="authError"
+            x-show="authError && !isCreateRecordModalOpen"
             role="alert"
             class="flex items-start justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
           >
@@ -369,7 +369,7 @@
               </div>
 
               <div class="space-y-2">
-                <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center flex-wrap gap-2">
                   <button
                     type="button"
                     @click="toggleFilterPanel()"
@@ -378,8 +378,18 @@
                     <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
                     Filter
                   </button>
+                  <button
+                    type="button"
+                    @click="openSortSheet()"
+                    aria-label="Sort leads"
+                    title="Sort leads"
+                    class="inline-flex items-center gap-1.5 min-w-0 max-w-[14rem] px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-medium"
+                  >
+                    <i data-lucide="arrow-down-up" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span class="truncate" x-text="getSortLabel()"></span>
+                  </button>
                   <span
-                    class="text-[0.625rem] text-slate-400 truncate"
+                    class="ml-auto text-[0.625rem] text-slate-400 truncate"
                     x-text="getFilterSummary()"
                   ></span>
                 </div>
@@ -488,6 +498,27 @@
 
             <!-- 3. LEADS QUEUE SECTION -->
             <section class="space-y-3">
+              <p
+                x-show="isLoadingExistingLeads"
+                role="status"
+                class="text-xs text-slate-500"
+              >
+                Loading existing leads…
+              </p>
+              <div
+                x-show="existingLeadsError"
+                class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+              >
+                <span role="alert" x-text="existingLeadsError"></span>
+                <button
+                  type="button"
+                  @click="loadExistingLeadsInBackground()"
+                  :disabled="isLoadingExistingLeads"
+                  class="ml-2 font-medium underline"
+                >
+                  Retry
+                </button>
+              </div>
               <div class="flex justify-between items-center">
                 <h2
                   class="text-xs font-bold uppercase tracking-wider text-slate-500"
@@ -709,7 +740,7 @@
               </div>
 
               <div
-                x-show="filteredLeads().length === 0"
+                x-show="filteredLeads().length === 0 && !isLoadingExistingLeads && !existingLeadsError"
                 class="bg-white rounded-xl border border-slate-200 p-4 text-center text-xs text-slate-500"
               >
                 No records found for this filter or search.
@@ -974,20 +1005,15 @@
                 >
                   Import leads
                 </h3>
-                <p
-                  class="mt-1 text-xs text-slate-500"
-                  x-show="!isAllLeadsView()"
-                >
+                <p class="mt-1 text-xs text-slate-500" x-show="!isAllLeadsView()">
                   Adds leads to
                   <span
                     class="font-medium text-slate-700"
                     x-text="getSelectedCampaignName()"
-                  ></span>.
+                  ></span
+                  >.
                 </p>
-                <p
-                  class="mt-1 text-sm text-slate-600"
-                  x-show="isAllLeadsView()"
-                >
+                <p class="mt-1 text-sm text-slate-600" x-show="isAllLeadsView()">
                   Choose a month before importing leads.
                 </p>
               </div>
@@ -1113,80 +1139,119 @@
             class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
             @click.self="closeCreateRecord()"
             @keydown.escape.window="closeCreateRecord()"
+            :inert="(isProgramEditorOpen && programEditorTarget === 'createRecord') || (isOptionSheetOpen && optionSheetMode === 'createQuality')"
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-record-title"
           >
             <form
               @submit.prevent="saveCreatedRecord()"
-              class="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-200 p-4 space-y-3"
+              class="w-full max-w-sm bg-white rounded-2xl shadow-xl border border-slate-200 p-4"
             >
-              <div>
-                <h3
-                  id="create-record-title"
-                  class="text-base font-semibold text-slate-900"
-                  x-text="createRecordType === 'Members' ? 'Add Member' : 'Add Lead'"
-                ></h3>
-                <p class="mt-1 text-xs text-slate-500">
-                  Create a record with a stable ID in the selected Seva.
-                </p>
-              </div>
-              <label class="block text-xs font-medium text-slate-700">
-                Name
-                <input
-                  type="text"
-                  x-model="createRecordDraft.name"
-                  required
-                  autocomplete="name"
-                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </label>
-              <label class="block text-xs font-medium text-slate-700">
-                Mobile
-                <input
-                  type="tel"
-                  x-model="createRecordDraft.mobile"
-                  required
-                  autocomplete="tel"
-                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </label>
-              <label class="block text-xs font-medium text-slate-700">
-                Seva
-                <select
-                  x-model="createRecordDraft.campaignId"
-                  required
-                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <template x-for="campaign in getCreateCampaigns()" :key="campaign.id">
-                    <option :value="campaign.id" x-text="campaign.name"></option>
-                  </template>
-                </select>
-              </label>
-              <label class="block text-xs font-medium text-slate-700">
-                Notes <span class="font-normal text-slate-400">(optional)</span>
-                <textarea
-                  x-model="createRecordDraft.notes"
-                  rows="2"
-                  class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                ></textarea>
-              </label>
-              <div class="flex justify-end gap-2 pt-1">
+              <fieldset :disabled="isCreateRecordSaving" class="space-y-3 min-w-0">
+                <div>
+                  <h3
+                    id="create-record-title"
+                    class="text-base font-semibold text-slate-900"
+                    x-text="createRecordType === 'Members' ? 'Add Member' : 'Add Lead'"
+                  ></h3>
+                  <p class="mt-1 text-xs text-slate-500">
+                    Add contact details for follow-up.
+                  </p>
+                  <p
+                    x-show="isAddLeadRoute && !isLeadEntryReady && isLoadingBootstrap"
+                    role="status"
+                    class="mt-1 text-xs text-slate-500"
+                    x-text="authenticatedUser ? 'Preparing lead form… You can start typing.' : 'Checking sign-in… You can start typing.'"
+                  ></p>
+                </div>
+                <label class="block text-xs font-medium text-slate-700">
+                  Name
+                  <input
+                    type="text"
+                    x-model="createRecordDraft.name"
+                    x-ref="createRecordName"
+                    required
+                    autocomplete="name"
+                    class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+                <label class="block text-xs font-medium text-slate-700">
+                  Mobile
+                  <input
+                    type="tel"
+                    x-model="createRecordDraft.mobile"
+                    required
+                    autocomplete="tel"
+                    class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+                <div class="flex items-center gap-3 min-w-0">
+                  <button
+                    x-show="createRecordType === 'Leads'"
+                    type="button"
+                    @click="openProgramEditor()"
+                    x-ref="createRecordPrograms"
+                    aria-label="Edit programs"
+                    :disabled="isAddLeadRoute && !isLeadEntryReady"
+                    title="Tap to edit programs"
+                    aria-haspopup="dialog"
+                    :aria-expanded="isProgramEditorOpen && programEditorTarget === 'createRecord'"
+                    class="min-w-0 max-w-[220px] truncate rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-left text-xs font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    x-text="formatPrograms(createRecordDraft.wishlistPrograms, '🎯') || '✏️ Program'"
+                  ></button>
+                  <button
+                    type="button"
+                    @click="openOptionSheet('quality')"
+                    x-ref="createRecordQuality"
+                    aria-label="Edit quality"
+                    :disabled="isAddLeadRoute && !isLeadEntryReady"
+                    aria-haspopup="dialog"
+                    :aria-expanded="isOptionSheetOpen && optionSheetMode === 'createQuality'"
+                    class="shrink-0 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-left text-xs font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    x-text="getQualityMeta(createRecordDraft.quality).icon + ' ' + createRecordDraft.quality"
+                  ></button>
+                </div>
+                <div
+                  x-show="authError"
+                  role="alert"
+                  class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700"
+                  x-text="authError"
+                ></div>
                 <button
+                  x-show="isAddLeadRoute && !isLeadEntryReady && !isLoadingBootstrap && authError"
                   type="button"
-                  @click="closeCreateRecord()"
-                  :disabled="isCreateRecordSaving"
-                  class="min-h-11 px-4 rounded-xl border border-slate-200 text-sm text-slate-600 disabled:opacity-50"
+                  @click="openAuthenticatedWorkspace()"
+                  class="text-xs font-medium text-indigo-700 underline"
                 >
-                  Cancel
+                  Retry preparing form
                 </button>
-                <button
-                  type="submit"
-                  :disabled="isCreateRecordSaving"
-                  class="min-h-11 px-4 rounded-xl bg-indigo-600 text-sm font-semibold text-white disabled:opacity-50"
-                  x-text="isCreateRecordSaving ? 'Saving…' : (createRecordType === 'Members' ? 'Add Member' : 'Add Lead')"
-                ></button>
-              </div>
+                <label class="block text-xs font-medium text-slate-700">
+                  Notes
+                  <span class="font-normal text-slate-400">(optional)</span>
+                  <textarea
+                    x-model="createRecordDraft.notes"
+                    rows="2"
+                    class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  ></textarea>
+                </label>
+                <div class="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    @click="closeCreateRecord()"
+                    :disabled="isCreateRecordSaving"
+                    class="min-h-11 px-4 rounded-xl border border-slate-200 text-sm text-slate-600 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    :disabled="isCreateRecordSaving || (isAddLeadRoute && !isLeadEntryReady)"
+                    class="min-h-11 px-4 rounded-xl bg-indigo-600 text-sm font-semibold text-white disabled:opacity-50"
+                    x-text="isCreateRecordSaving ? 'Saving…' : (createRecordType === 'Members' ? 'Add Member' : 'Add Lead')"
+                  ></button>
+                </div>
+              </fieldset>
             </form>
           </div>
 
@@ -1472,12 +1537,14 @@
           <div
             x-show="isOptionSheetOpen"
             x-transition.opacity
-            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            class="fixed inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
             @click.self="closeOptionSheet()"
             @keydown.escape.window="closeOptionSheet()"
             role="dialog"
             aria-modal="true"
             aria-labelledby="option-sheet-title"
+            tabindex="-1"
+            x-ref="optionSheet"
           >
             <div
               class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-2"
@@ -1508,12 +1575,14 @@
           <div
             x-show="isProgramEditorOpen"
             x-transition.opacity
-            class="fixed inset-0 z-40 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            class="fixed inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
             @click.self="closeProgramEditor()"
             @keydown.escape.window="closeProgramEditor()"
             role="dialog"
             aria-modal="true"
             aria-labelledby="program-editor-title"
+            tabindex="-1"
+            x-ref="programEditor"
           >
             <div
               class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-3"
@@ -1535,6 +1604,7 @@
                     <button
                       type="button"
                       @click="toggleProgramSelection('wishlist', program.code)"
+                      :aria-pressed="isProgramSelected('wishlist', program.code)"
                       class="px-2 py-1 rounded-full text-[11px] border"
                       :class="isProgramSelected('wishlist', program.code) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-700 border-slate-200'"
                       x-text="program.code"
@@ -1543,7 +1613,10 @@
                 </div>
               </div>
 
-              <div class="space-y-2" x-show="shouldShowDonePrograms()">
+              <div
+                class="space-y-2"
+                x-show="programEditorTarget === 'lead' && shouldShowDonePrograms()"
+              >
                 <div class="text-xs font-medium text-slate-600">✅ Completed</div>
                 <div class="flex flex-wrap gap-1.5">
                   <template
@@ -1553,6 +1626,7 @@
                     <button
                       type="button"
                       @click="toggleProgramSelection('done', program.code)"
+                      :aria-pressed="isProgramSelected('done', program.code)"
                       class="px-2 py-1 rounded-full text-[11px] border"
                       :class="isProgramSelected('done', program.code) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'"
                       x-text="program.code"

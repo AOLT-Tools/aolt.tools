@@ -56,7 +56,10 @@ export class HttpAuthProvider implements AuthProvider {
 
   async signIn(): Promise<AuthenticatedUser> {
     if (typeof window !== 'undefined') {
-      window.location.assign('/api/seva/auth/signin');
+      const returnTo = /^\/seva\/add-lead\/?$/.test(window.location.pathname)
+        ? '?returnTo=%2Fseva%2Fadd-lead'
+        : '';
+      window.location.assign('/api/seva/auth/signin' + returnTo);
     }
 
     return new Promise<AuthenticatedUser>(() => {
@@ -72,8 +75,14 @@ export class HttpAuthProvider implements AuthProvider {
 export class HttpLeadRepository implements LeadRepository {
   constructor(private readonly apiClient: ApiClient) {}
 
-  async getBootstrap(campaignId?: string | null): Promise<BootstrapResponse> {
-    const query = campaignId ? '?campaignId=' + encodeURIComponent(campaignId) : '';
+  async getBootstrap(
+    campaignId?: string | null,
+    metadataOnly = false
+  ): Promise<BootstrapResponse> {
+    const params = new URLSearchParams();
+    if (campaignId) params.set('campaignId', campaignId);
+    if (metadataOnly) params.set('metadataOnly', '1');
+    const query = params.size ? '?' + params.toString() : '';
     const response = await this.apiClient.get<unknown>('/api/seva/bootstrap' + query);
     return BootstrapResponseSchema.parse(response);
   }
@@ -104,7 +113,10 @@ export class HttpLeadRepository implements LeadRepository {
 
   async importLeads(payload: ImportLeadsRequest): Promise<ImportLeadsResponse> {
     const parsed = ImportLeadsRequestSchema.parse(payload);
-    const response = await this.apiClient.post<unknown>('/api/seva/leads/import', parsed);
+    const response = await this.apiClient.post<unknown>(
+      '/api/seva/leads/import',
+      parsed
+    );
     return ImportLeadsResponseSchema.parse(response);
   }
 

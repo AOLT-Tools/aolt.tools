@@ -1,3 +1,4 @@
+import { withVolunteerTransferNote } from '../../shared/leadTransfer.js';
 import {
   ALL_LEADS_SCOPE_ID,
   AssignMembersRequestSchema,
@@ -114,7 +115,8 @@ export function isUserAllowed(email: string) {
 
 export async function getBootstrapForUser(
   user: AuthenticatedUser,
-  campaignId?: string | null
+  campaignId?: string | null,
+  metadataOnly = false
 ) {
   const store = getStore();
   if (isAllLeadsScope(campaignId)) {
@@ -127,12 +129,14 @@ export async function getBootstrapForUser(
       ...mockBootstrapData,
       user,
       campaignId: ALL_LEADS_SCOPE_ID,
-      leads: store.leads.filter(
-        (lead) =>
-          isAssignedToUser(lead, String(user.email || '')) &&
-          lead.campaignType === 'Leads' &&
-          leadCampaignIds.has(String(lead.campaignId || ''))
-      )
+      leads: metadataOnly
+        ? []
+        : store.leads.filter(
+            (lead) =>
+              isAssignedToUser(lead, String(user.email || '')) &&
+              lead.campaignType === 'Leads' &&
+              leadCampaignIds.has(String(lead.campaignId || ''))
+          )
     });
   }
 
@@ -148,12 +152,14 @@ export async function getBootstrapForUser(
     ...mockBootstrapData,
     user,
     campaignId: selectedCampaign.id,
-    leads: store.leads.filter(
-      (lead) =>
-        isAssignedToUser(lead, String(user.email || '')) &&
-        lead.campaignId === selectedCampaign.id &&
-        lead.campaignType === selectedCampaign.type
-    )
+    leads: metadataOnly
+      ? []
+      : store.leads.filter(
+          (lead) =>
+            isAssignedToUser(lead, String(user.email || '')) &&
+            lead.campaignId === selectedCampaign.id &&
+            lead.campaignType === selectedCampaign.type
+        )
   };
 
   return BootstrapResponseSchema.parse(payload);
@@ -186,16 +192,23 @@ export async function updateLeadForUser(
   store.leads[index] = {
     ...store.leads[index],
     ...parsed,
+    notes: withVolunteerTransferNote(
+      parsed.notes ?? store.leads[index].notes,
+      store.leads[index].assignedVolunteerEmail,
+      targetVolunteerEmail,
+      mockBootstrapData.config.volunteers || [],
+      new Date().toISOString()
+    ),
     assignedVolunteerEmail:
       targetVolunteerEmail || store.leads[index].assignedVolunteerEmail,
-    lastUpdated: 'Just now'
+    lastUpdated: new Date().toISOString()
   };
 
   return UpdateLeadResponseSchema.parse({
     success: true,
     lead: {
       id: parsed.id,
-      lastUpdated: 'Just now'
+      lastUpdated: new Date().toISOString()
     }
   });
 }
@@ -268,15 +281,17 @@ export async function createLeadForUser(
     id: nanoid(),
     mobile: parsed.mobile,
     name: parsed.name,
-    quality: parsed.campaignType === 'Members' ? 'Engagement' : 'Quality',
+    quality:
+      parsed.quality || (parsed.campaignType === 'Members' ? 'Engagement' : 'Quality'),
     followUp: 'Follow-up',
     lastUpdated: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     status: 'Response',
     notes: parsed.notes || '',
     campaignId: parsed.campaignId,
     campaignType: parsed.campaignType,
     assignedVolunteerEmail: normalizeEmail(user.email),
-    wishlistPrograms: '',
+    wishlistPrograms: parsed.wishlistPrograms || '',
     donePrograms: ''
   };
   store.leads.push(lead);
@@ -298,7 +313,9 @@ export async function importLeadsForUser(
   if (rows.length > MAX_IMPORT_ROWS + 1) {
     throw new LeadImportError('SHEET_TOO_LARGE', sheetTooLargeMessage());
   }
-  const campaign = mockBootstrapData.config.campaigns.find((item) => item.id === campaignId);
+  const campaign = mockBootstrapData.config.campaigns.find(
+    (item) => item.id === campaignId
+  );
   if (!campaign) {
     throw new Error('CAMPAIGN_NOT_FOUND');
   }
@@ -333,6 +350,7 @@ export async function importLeadsForUser(
     quality: 'Quality',
     followUp: 'Follow-up',
     lastUpdated: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     status: 'Response',
     notes: item.notes,
     campaignId: campaign.id,

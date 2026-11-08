@@ -1,3 +1,5 @@
+import { buildLeadShareMessage } from '../../shared/leadShare.js';
+import { ensureCreatedAtColumn } from '../leads/createdAt.js';
 import type { Campaign } from '../../shared/contracts/appContracts.js';
 import {
   DEFAULT_PROGRAMS,
@@ -373,7 +375,11 @@ export async function upsertLeadByMobileAndCampaign(
     return { action: 'updated' };
   }
 
+  await ensureCreatedAtColumn(headers, layout.leadsRange, (updates) =>
+    updateSheetValuesBatch('data', updates)
+  );
   const rowRecord: Record<string, string> = {
+    createdAt: now,
     id: nanoid(),
     name: parsed.name,
     quality: parsed.leadQuality || 'Quality',
@@ -447,18 +453,7 @@ export function buildEditableLeadMessage(parsed: ParsedLeadMessage): string {
 }
 
 export function buildShareableLeadMessage(parsed: ParsedLeadMessage): string {
-  return [
-    'Lead added 👍',
-    '',
-    'Name: ' + parsed.name,
-    'Mobile: ' + parsed.mobile,
-    parsed.course ? 'Course: ' + parsed.course : '',
-    parsed.leadQuality ? 'Quality: ' + parsed.leadQuality : '',
-    parsed.month ? 'Month: ' + parsed.month : '',
-    parsed.notes ? 'Notes: ' + parsed.notes : ''
-  ]
-    .filter((line, index) => index < 2 || Boolean(line))
-    .join('\n');
+  return buildLeadShareMessage(parsed);
 }
 
 export async function handleIncomingText(

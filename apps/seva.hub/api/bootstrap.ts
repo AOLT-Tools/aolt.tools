@@ -1,8 +1,4 @@
-import {
-  firstQueryValue,
-  type ApiRequest,
-  type ApiResponse
-} from '@aolt/core/api';
+import { firstQueryValue, type ApiRequest, type ApiResponse } from '@aolt/core/api';
 import { methodNotAllowed, sendApiError } from '../server/errors.js';
 
 async function loadSessionUser(req: ApiRequest) {
@@ -48,7 +44,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const campaignId = firstQueryValue(req, 'campaignId') || undefined;
     const store = await loadDataStore();
-    const result = await store.getBootstrapForAuthorizedUser(user, campaignId);
+    const result =
+      firstQueryValue(req, 'metadataOnly') === '1'
+        ? await store.getBootstrapForAuthorizedUser(user, campaignId, undefined, true)
+        : await store.getBootstrapForAuthorizedUser(user, campaignId);
     if (!result.allowed) {
       return sendApiError(res, new Error('Authorization denied.'), context, {
         status: 403,

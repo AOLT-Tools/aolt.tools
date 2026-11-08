@@ -1,3 +1,4 @@
+import { buildLeadShareMessage } from '../../../shared/leadShare';
 import {
   isAllLeadsScope,
   MAX_MEMBERS_PER_VOLUNTEER,
@@ -102,11 +103,15 @@ function campaignForRecord(
   context: SevaWorkspaceContext,
   lead: Lead
 ): Campaign | undefined {
-  const fromLead = context.campaigns.find((campaign) => campaign.id === lead.campaignId);
+  const fromLead = context.campaigns.find(
+    (campaign) => campaign.id === lead.campaignId
+  );
   if (fromLead) {
     return fromLead;
   }
-  return context.campaigns.find((campaign) => campaign.id === context.selectedCampaignId);
+  return context.campaigns.find(
+    (campaign) => campaign.id === context.selectedCampaignId
+  );
 }
 
 function getMoveCampaignDestinations(context: SevaWorkspaceContext): Campaign[] {
@@ -448,7 +453,9 @@ export function createRecordActionMethods() {
             return Promise.reject(new Error('Campaign not found.'));
           }
           return window.appRuntime.updateLead({
-            ...toUpdateRequest(this, lead, recordCampaign),
+            id: lead.id,
+            campaignId: recordCampaign.id,
+            campaignType: recordCampaign.type,
             assignedVolunteerEmail: normalizedEmail
           });
         });
@@ -627,6 +634,13 @@ export function createRecordActionMethods() {
     ): Campaign[] {
       return this.campaigns.filter((campaign) => campaign.type === type);
     },
+    getCreateCampaignId(this: SevaWorkspaceContext, type: CampaignType): string {
+      const campaigns = this.getCreateCampaigns(type) as Campaign[];
+      const preferred = campaigns.find(
+        (campaign) => campaign.id === this.selectedCampaignId
+      );
+      return (preferred || campaigns[0])?.id || '';
+    },
     openCreateRecord(this: SevaWorkspaceContext, type: CampaignType): void {
       const campaigns = this.getCreateCampaigns(type);
       if (!campaigns.length) {
@@ -634,25 +648,58 @@ export function createRecordActionMethods() {
           'No ' + type.toLowerCase() + ' Seva is available for this record.';
         return;
       }
-      const preferred = campaigns.find(
-        (campaign: Campaign) => campaign.id === this.selectedCampaignId
-      );
       this.createRecordType = type;
       this.createRecordDraft = {
         name: '',
         mobile: '',
         notes: '',
-        campaignId: (preferred || campaigns[0])?.id || ''
+        quality: type === 'Members' ? 'Engagement' : 'Quality',
+        wishlistPrograms: [],
+        campaignId: this.getCreateCampaignId(type)
       };
       this.isFabOpen = false;
+      this.authError = '';
       this.isCreateRecordModalOpen = true;
+      this.$nextTick?.(() => this.$refs?.createRecordName?.focus());
     },
     closeCreateRecord(this: SevaWorkspaceContext): void {
-      if (!this.isCreateRecordSaving) {
+      if (
+        !this.isCreateRecordSaving &&
+        !this.isProgramEditorOpen &&
+        !this.isOptionSheetOpen
+      ) {
         this.isCreateRecordModalOpen = false;
+        this.leaveAddLeadRoute();
+      }
+    },
+    leaveAddLeadRoute(this: SevaWorkspaceContext): void {
+      if (!this.isAddLeadRoute) return;
+      this.isAddLeadRoute = false;
+      if (window.location?.href && window.history?.replaceState) {
+        const url = new URL(window.location.href);
+        url.pathname = '/seva';
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      }
+      if (this.isLeadEntryReady) void this.loadExistingLeadsInBackground();
+    },
+    async copyCreatedLeadDetails(text: string): Promise<boolean> {
+      try {
+        if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText)
+          throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        return false;
       }
     },
     async saveCreatedRecord(this: SevaWorkspaceContext): Promise<void> {
+      if (
+        this.isCreateRecordSaving ||
+        (this.isAddLeadRoute && !this.isLeadEntryReady) ||
+        this.isProgramEditorOpen ||
+        this.isOptionSheetOpen
+      )
+        return;
       const name = this.createRecordDraft.name.trim();
       const mobile = normalizeIndianMobile(this.createRecordDraft.mobile);
       if (!name || !mobile || !this.createRecordDraft.campaignId) {
@@ -670,6 +717,16 @@ export function createRecordActionMethods() {
           name,
           mobile,
           notes: this.createRecordDraft.notes.trim(),
+          ...(this.createRecordDraft.quality
+            ? { quality: this.createRecordDraft.quality }
+            : {}),
+          ...(this.createRecordDraft.wishlistPrograms.length
+            ? {
+                wishlistPrograms: this.getProgramListForSave(
+                  this.createRecordDraft.wishlistPrograms
+                )
+              }
+            : {}),
           campaignId: this.createRecordDraft.campaignId,
           campaignType: this.createRecordType
         });
@@ -681,9 +738,25 @@ export function createRecordActionMethods() {
           this.leads = [this.normalizeLead(response.lead), ...this.leads];
         }
         this.isCreateRecordModalOpen = false;
+        this.leaveAddLeadRoute();
+        let clipboardCopied = true;
+        if (this.createRecordType === 'Leads') {
+          const lead = response.lead;
+          const campaign = this.campaigns.find((item) => item.id === lead.campaignId);
+          const shareText = buildLeadShareMessage({
+            name: lead.name,
+            mobile: lead.mobile,
+            course: lead.wishlistPrograms,
+            leadQuality: lead.quality === 'Quality' ? '' : lead.quality,
+            month: campaign?.name || '',
+            notes: lead.notes
+          });
+          clipboardCopied = await this.copyCreatedLeadDetails(shareText);
+        }
         this.actionMessage =
           (this.createRecordType === 'Members' ? 'Member' : 'Lead') +
-          ' added successfully.';
+          ' added successfully.' +
+          (clipboardCopied ? '' : ' Clipboard access was blocked.');
       } catch (error) {
         this.authError = toUserErrorMessage(
           error,

@@ -6,6 +6,7 @@ import type {
   StatusMeta,
   TextSize
 } from './types';
+import { getDefaultQualityOptionsForCampaignType } from '../../config/campaignDefaults';
 
 const TEXT_SIZE_SCALE: Record<TextSize, string> = {
   normal: '1',
@@ -87,25 +88,41 @@ export function createUiMethods() {
     openOptionSheet(
       this: SevaWorkspaceContext,
       mode: 'quality' | 'status',
-      lead: Lead
+      lead?: Lead
     ): void {
-      this.activateCard(lead);
-      this.optionSheetMode = mode;
-      this.activeOptionLead = lead;
+      if (
+        !lead &&
+        (mode !== 'quality' ||
+          !this.isCreateRecordModalOpen ||
+          this.isCreateRecordSaving)
+      ) {
+        return;
+      }
+      if (lead) {
+        this.activateCard(lead);
+      }
+      this.optionSheetMode = lead ? mode : 'createQuality';
+      this.activeOptionLead = lead || null;
 
       if (mode === 'quality') {
-        this.optionSheetTitle = 'Update ' + this.getQualityFieldLabel();
-        const qualityPlaceholder = this.getQualityFieldLabel();
-        const qualityValues = (this.qualityOptions || [])
-          .map((item: OptionItem) => item.value)
-          .filter((value: string) => value !== qualityPlaceholder);
+        const qualityPlaceholder = lead
+          ? this.getQualityFieldLabel()
+          : this.createRecordType === 'Members'
+            ? 'Engagement'
+            : 'Quality';
+        this.optionSheetTitle = 'Update ' + qualityPlaceholder;
+        const qualityValues = (
+          lead
+            ? (this.qualityOptions || []).map((item: OptionItem) => item.value)
+            : [...getDefaultQualityOptionsForCampaignType(this.createRecordType)]
+        ).filter((value: string) => value !== qualityPlaceholder);
         const qualityIconMap: Record<string, string> = {};
         qualityValues.forEach((quality: string) => {
           qualityIconMap[quality] = this.getQualityMeta(quality).icon;
         });
         this.optionSheetOptions = this.toOptionItems(qualityValues, qualityIconMap);
-        this.currentOptionValue = lead.quality;
-      } else {
+        this.currentOptionValue = lead ? lead.quality : this.createRecordDraft.quality;
+      } else if (lead) {
         this.optionSheetTitle = 'Update Status';
         const statusIconMap: Record<string, string> = {};
         const statusValues = (this.statusOptions || []).filter(
@@ -119,19 +136,33 @@ export function createUiMethods() {
       }
 
       this.isOptionSheetOpen = true;
+      this.$nextTick?.(() => this.$refs?.optionSheet?.focus());
     },
     closeOptionSheet(this: SevaWorkspaceContext): void {
+      const editingCreateRecord = this.optionSheetMode === 'createQuality';
       this.isOptionSheetOpen = false;
       this.optionSheetMode = '';
       this.optionSheetTitle = '';
       this.optionSheetOptions = [];
       this.currentOptionValue = '';
       this.activeOptionLead = null;
+      if (editingCreateRecord) {
+        this.$nextTick?.(() => this.$refs?.createRecordQuality?.focus());
+      }
     },
     async applyOptionSelection(
       this: SevaWorkspaceContext,
       value: string
     ): Promise<void> {
+      if (this.optionSheetMode === 'sort') {
+        await this.selectLeadSort(value);
+        return;
+      }
+      if (this.optionSheetMode === 'createQuality') {
+        this.createRecordDraft.quality = value;
+        this.closeOptionSheet();
+        return;
+      }
       if (this.optionSheetMode === 'campaign') {
         this.closeOptionSheet();
         await this.onCampaignChange(value);

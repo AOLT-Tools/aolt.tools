@@ -1,3 +1,4 @@
+import { withVolunteerTransferNote } from '../../../shared/leadTransfer';
 import type { LeadRepository } from '../contracts';
 import { nanoid } from 'nanoid';
 import {
@@ -41,7 +42,10 @@ import { mockBootstrapData } from './mockData';
 export class MockLeadRepository implements LeadRepository {
   private leads: Lead[] = structuredClone(mockBootstrapData.leads);
 
-  async getBootstrap(campaignId?: string | null): Promise<BootstrapResponse> {
+  async getBootstrap(
+    campaignId?: string | null,
+    metadataOnly = false
+  ): Promise<BootstrapResponse> {
     if (isAllLeadsScope(campaignId)) {
       const leadCampaignIds = new Set(
         mockBootstrapData.config.campaigns
@@ -51,13 +55,15 @@ export class MockLeadRepository implements LeadRepository {
       return BootstrapResponseSchema.parse({
         ...mockBootstrapData,
         campaignId: ALL_LEADS_SCOPE_ID,
-        leads: this.leads
-          .filter(
-            (lead) =>
-              lead.campaignType === 'Leads' &&
-              leadCampaignIds.has(String(lead.campaignId || ''))
-          )
-          .map((lead) => ({ ...lead }))
+        leads: metadataOnly
+          ? []
+          : this.leads
+              .filter(
+                (lead) =>
+                  lead.campaignType === 'Leads' &&
+                  leadCampaignIds.has(String(lead.campaignId || ''))
+              )
+              .map((lead) => ({ ...lead }))
       });
     }
 
@@ -73,13 +79,15 @@ export class MockLeadRepository implements LeadRepository {
     const payload = {
       ...mockBootstrapData,
       campaignId: selectedCampaign.id,
-      leads: this.leads
-        .filter(
-          (lead) =>
-            lead.campaignId === selectedCampaign.id &&
-            lead.campaignType === selectedCampaign.type
-        )
-        .map((lead) => ({ ...lead }))
+      leads: metadataOnly
+        ? []
+        : this.leads
+            .filter(
+              (lead) =>
+                lead.campaignId === selectedCampaign.id &&
+                lead.campaignType === selectedCampaign.type
+            )
+            .map((lead) => ({ ...lead }))
     };
 
     return BootstrapResponseSchema.parse(payload);
@@ -152,14 +160,21 @@ export class MockLeadRepository implements LeadRepository {
     this.leads[index] = {
       ...this.leads[index],
       ...parsed,
-      lastUpdated: 'Just now'
+      notes: withVolunteerTransferNote(
+        parsed.notes ?? this.leads[index].notes,
+        this.leads[index].assignedVolunteerEmail,
+        parsed.assignedVolunteerEmail,
+        mockBootstrapData.config.volunteers || [],
+        new Date().toISOString()
+      ),
+      lastUpdated: new Date().toISOString()
     };
 
     return UpdateLeadResponseSchema.parse({
       success: true,
       lead: {
         id: parsed.id,
-        lastUpdated: 'Just now'
+        lastUpdated: new Date().toISOString()
       }
     });
   }
@@ -170,15 +185,18 @@ export class MockLeadRepository implements LeadRepository {
       id: nanoid(),
       mobile: parsed.mobile,
       name: parsed.name,
-      quality: parsed.campaignType === 'Members' ? 'Engagement' : 'Quality',
+      quality:
+        parsed.quality ||
+        (parsed.campaignType === 'Members' ? 'Engagement' : 'Quality'),
       followUp: 'Follow-up',
-      lastUpdated: 'Just now',
+      lastUpdated: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       status: 'Response',
       notes: parsed.notes || '',
       campaignId: parsed.campaignId,
       campaignType: parsed.campaignType,
       assignedVolunteerEmail: mockBootstrapData.user.email,
-      wishlistPrograms: '',
+      wishlistPrograms: parsed.wishlistPrograms || '',
       donePrograms: ''
     };
     this.leads.push(lead);
@@ -220,7 +238,8 @@ export class MockLeadRepository implements LeadRepository {
       name: item.name,
       quality: 'Quality',
       followUp: 'Follow-up',
-      lastUpdated: 'Just now',
+      lastUpdated: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       status: 'Response',
       notes: item.notes,
       campaignId: parsed.campaignId,

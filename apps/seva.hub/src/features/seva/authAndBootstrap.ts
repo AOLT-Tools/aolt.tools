@@ -246,6 +246,8 @@ export function createAuthAndBootstrapMethods() {
       this.globalPointerDownHandler = (event: PointerEvent) =>
         this.handleGlobalPointerDown(event);
       document.addEventListener('pointerdown', this.globalPointerDownHandler, true);
+      if (this.isCreateRecordModalOpen)
+        this.$nextTick?.(() => this.$refs?.createRecordName?.focus());
       await this.initializeAuthenticatedSession(requestedCampaignId);
       if (!this.authenticatedUser && !this.authError && redirectError) {
         this.authError = redirectError;
@@ -260,6 +262,8 @@ export function createAuthAndBootstrapMethods() {
       try {
         const user = await window.appRuntime.getAuthenticatedUser();
         if (!user) {
+          this.isCreateRecordModalOpen = false;
+          this.isLeadEntryReady = false;
           this.isVolunteerModalOpen = true;
           this.isLoadingBootstrap = false;
           return;
@@ -269,12 +273,15 @@ export function createAuthAndBootstrapMethods() {
           .trim()
           .toLowerCase();
         this.isVolunteerModalOpen = false;
+        this.restoreLeadSort();
         await this.openAuthenticatedWorkspace(requestedCampaignId);
       } catch (error) {
         this.authError = toAuthErrorMessage(
           error,
           'Unable to verify session. Please try again.'
         );
+        this.isCreateRecordModalOpen = false;
+        this.isLeadEntryReady = false;
         this.isVolunteerModalOpen = true;
         this.isLoadingBootstrap = false;
       }
@@ -290,9 +297,12 @@ export function createAuthAndBootstrapMethods() {
           .trim()
           .toLowerCase();
         this.isVolunteerModalOpen = false;
+        this.restoreLeadSort();
         await this.openAuthenticatedWorkspace(requestedCampaignId);
       } catch (error) {
         this.authError = toAuthErrorMessage(error, 'Sign in failed. Please try again.');
+        this.isCreateRecordModalOpen = false;
+        this.isLeadEntryReady = false;
         this.isVolunteerModalOpen = true;
         this.isLoadingBootstrap = false;
       }
@@ -346,6 +356,13 @@ export function createAuthAndBootstrapMethods() {
         return;
       }
 
+      this.leadSort = 'added-desc';
+      this.bootstrapGeneration += 1;
+      this.isLoadingBootstrap = false;
+      this.isLoadingExistingLeads = false;
+      this.existingLeadsError = '';
+      this.isCreateRecordModalOpen = false;
+      this.isLeadEntryReady = false;
       this.authenticatedUser = null;
       this.volunteerEmail = '';
       this.authError = '';
@@ -380,12 +397,68 @@ export function createAuthAndBootstrapMethods() {
         this.volunteerEmail,
         requestedCampaignId
       );
-      const loaded = await this.loadBootstrap(campaignId);
-      if (loaded || isAllLeadsScope(campaignId)) {
-        return;
+      const metadataOnly = this.isAddLeadRoute;
+      if (metadataOnly) {
+        this.isCreateRecordModalOpen = true;
+        this.isLeadEntryReady = false;
       }
-      if (this.authError === MISSING_CAMPAIGN_MESSAGE) {
-        await this.loadBootstrap(ALL_LEADS_SCOPE_ID);
+      const loaded = await this.loadBootstrap(campaignId, metadataOnly);
+      const ready =
+        loaded ||
+        (!isAllLeadsScope(campaignId) &&
+          this.authError === MISSING_CAMPAIGN_MESSAGE &&
+          (await this.loadBootstrap(ALL_LEADS_SCOPE_ID, metadataOnly)));
+      if (ready && metadataOnly) {
+        // Resolve only the destination: never reset text typed while loading.
+        this.createRecordDraft.campaignId = this.getCreateCampaignId('Leads');
+        this.isLeadEntryReady = Boolean(this.createRecordDraft.campaignId);
+        if (!this.isLeadEntryReady)
+          this.authError = 'No leads Seva is available for this record.';
+        if (!this.isAddLeadRoute) void this.loadExistingLeadsInBackground();
+      }
+    },
+    async loadExistingLeadsInBackground(this: SevaWorkspaceContext): Promise<void> {
+      if (
+        !this.authenticatedUser ||
+        !this.selectedCampaignId ||
+        this.isLoadingBootstrap
+      )
+        return;
+      const generation = ++this.bootstrapGeneration;
+      const campaignId = this.selectedCampaignId;
+      const volunteerEmail = this.volunteerEmail;
+      const source = this.leads;
+      const isCurrent = () =>
+        generation === this.bootstrapGeneration &&
+        campaignId === this.selectedCampaignId &&
+        volunteerEmail === this.volunteerEmail &&
+        Boolean(this.authenticatedUser);
+      this.isLoadingExistingLeads = true;
+      this.existingLeadsError = '';
+      try {
+        const response = await window.appRuntime.loadBootstrap(campaignId);
+        if (!isCurrent()) return;
+        if (!response?.success) throw new Error('Seva data could not be loaded.');
+        // A create/delete/transfer happened while the read was running. Fetch a
+        // fresh snapshot rather than dropping a new lead or reviving a removed one.
+        if (this.leads !== source) {
+          void this.loadExistingLeadsInBackground();
+          return;
+        }
+        const current = new Map(this.leads.map((lead) => [lead.id, lead]));
+        const loaded = response.leads
+          .map((lead) => current.get(lead.id) || this.normalizeLead(lead))
+          .reverse();
+        const ids = new Set(loaded.map((lead: Lead) => lead.id));
+        this.leads = [...this.leads.filter((lead) => !ids.has(lead.id)), ...loaded];
+      } catch (error) {
+        if (isCurrent())
+          this.existingLeadsError = toAuthErrorMessage(
+            error,
+            'Unable to load existing leads. Please retry.'
+          );
+      } finally {
+        if (isCurrent()) this.isLoadingExistingLeads = false;
       }
     },
     async onCampaignChange(
@@ -489,13 +562,11 @@ export function createAuthAndBootstrapMethods() {
           label: 'All',
           icon: '📋'
         },
-        ...this.campaigns.map(
-          (campaign: Campaign): OptionItem => ({
-            value: campaign.id,
-            label: campaign.name,
-            icon: campaign.type === 'Members' ? '👥' : '📞'
-          })
-        )
+        ...this.campaigns.map((campaign: Campaign): OptionItem => ({
+          value: campaign.id,
+          label: campaign.name,
+          icon: campaign.type === 'Members' ? '👥' : '📞'
+        }))
       ];
       this.currentOptionValue = this.selectedCampaignId;
       this.activeOptionLead = null;
@@ -515,7 +586,8 @@ export function createAuthAndBootstrapMethods() {
     },
     async loadBootstrap(
       this: SevaWorkspaceContext,
-      campaignId?: string
+      campaignId?: string,
+      metadataOnly = false
     ): Promise<boolean> {
       if (!this.volunteerEmail) {
         this.isVolunteerModalOpen = true;
@@ -527,11 +599,21 @@ export function createAuthAndBootstrapMethods() {
         ? captureCampaignView(this)
         : null;
 
+      const generation = ++this.bootstrapGeneration;
+      const sessionEmail = this.volunteerEmail.trim().toLowerCase();
+      this.isLoadingExistingLeads = false;
+      this.existingLeadsError = '';
       this.isLoadingBootstrap = true;
       try {
-        const response = await window.appRuntime.loadBootstrap(
-          campaignId || this.selectedCampaignId || null
-        );
+        const targetCampaignId = campaignId || this.selectedCampaignId || null;
+        const response = metadataOnly
+          ? await window.appRuntime.loadBootstrap(targetCampaignId, true)
+          : await window.appRuntime.loadBootstrap(targetCampaignId);
+        if (
+          generation !== this.bootstrapGeneration ||
+          sessionEmail !== this.volunteerEmail.trim().toLowerCase()
+        )
+          return false;
         if (!response || !response.success) {
           throw new Error('Seva data could not be loaded.');
         }
@@ -598,7 +680,9 @@ export function createAuthAndBootstrapMethods() {
             this.campaigns.find((item) => item.id === this.selectedCampaignId) ||
             this.campaigns[0] ||
             null;
-          this.campaignType = this.selectedCampaign ? this.selectedCampaign.type : 'Leads';
+          this.campaignType = this.selectedCampaign
+            ? this.selectedCampaign.type
+            : 'Leads';
           this.campaignMessage = this.selectedCampaign
             ? this.selectedCampaign.message || ''
             : '';
@@ -621,7 +705,7 @@ export function createAuthAndBootstrapMethods() {
         this.filterOptions = this.getCampaignUiMeta().filterOptions;
         this.selectedFilter = this.filterOptions[0] ? this.filterOptions[0].id : 'all';
         this.programFilter = '';
-        this.leads = (response.leads || [])
+        this.leads = (metadataOnly ? [] : response.leads || [])
           .map((lead: unknown) => this.normalizeLead(lead))
           .reverse();
         if (!this.appConfig.programs.length) {
@@ -645,6 +729,7 @@ export function createAuthAndBootstrapMethods() {
         this.authError = '';
         return true;
       } catch (error) {
+        if (generation !== this.bootstrapGeneration) return false;
         if (previousCampaignView) {
           restoreCampaignView(this, previousCampaignView);
         } else {
@@ -657,11 +742,13 @@ export function createAuthAndBootstrapMethods() {
           isApiClientError(error) &&
           (error.code === 'FORBIDDEN' || error.code === 'UNAUTHENTICATED')
         ) {
+          this.isCreateRecordModalOpen = false;
+          this.isLeadEntryReady = false;
           this.isVolunteerModalOpen = true;
         }
         return false;
       } finally {
-        this.isLoadingBootstrap = false;
+        if (generation === this.bootstrapGeneration) this.isLoadingBootstrap = false;
       }
     },
     getQualityFieldLabel(this: SevaWorkspaceContext): string {

@@ -26,7 +26,16 @@ export function createEmptyCourseDraft(courseType = 'HP') {
 }
 
 export function createSevaWorkspaceInitialState(): SevaWorkspaceState {
+  const isAddLeadRoute =
+    typeof window !== 'undefined' &&
+    /^\/seva\/add-lead\/?$/.test(window.location?.pathname || '');
   return {
+    isAddLeadRoute,
+    isLeadEntryReady: false,
+    isLoadingExistingLeads: false,
+    existingLeadsError: '',
+    bootstrapGeneration: 0,
+    leadSort: 'added-desc',
     campaigns: [],
     selectedCampaignId: '',
     selectedCampaign: null,
@@ -54,6 +63,7 @@ export function createSevaWorkspaceInitialState(): SevaWorkspaceState {
     activeFollowUpLead: null,
     followUpDraft: '',
     isProgramEditorOpen: false,
+    programEditorTarget: 'lead',
     activeProgramLead: null,
     activeCardId: '',
     selectedIds: new Set<string>(),
@@ -62,12 +72,14 @@ export function createSevaWorkspaceInitialState(): SevaWorkspaceState {
     suppressCardClickLeadId: '',
     isBulkActionPending: false,
     isFabOpen: false,
-    isCreateRecordModalOpen: false,
+    isCreateRecordModalOpen: isAddLeadRoute,
     createRecordType: 'Leads',
     createRecordDraft: {
       name: '',
       mobile: '',
       notes: '',
+      quality: 'Quality',
+      wishlistPrograms: [],
       campaignId: ''
     },
     isCreateRecordSaving: false,

@@ -34,13 +34,18 @@ export const mockDataStore: ApiDataStore = {
     return isMockUserAllowed(user.email);
   },
 
-  async getBootstrapForAuthorizedUser(user, campaignId) {
+  async getBootstrapForAuthorizedUser(
+    user,
+    campaignId,
+    _operation,
+    metadataOnly = false
+  ) {
     if (!isMockUserAllowed(user.email)) {
       return { allowed: false };
     }
     return {
       allowed: true,
-      value: await getMockBootstrapForUser(user, campaignId)
+      value: await getMockBootstrapForUser(user, campaignId, metadataOnly)
     };
   },
 
@@ -73,7 +78,10 @@ export const mockDataStore: ApiDataStore = {
     }
     return {
       allowed: true,
-      value: await importMockLeadsForUser(user, payload as { campaignId?: unknown; rows?: unknown })
+      value: await importMockLeadsForUser(
+        user,
+        payload as { campaignId?: unknown; rows?: unknown }
+      )
     };
   },
 
