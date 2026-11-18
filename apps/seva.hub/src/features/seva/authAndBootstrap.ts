@@ -240,6 +240,7 @@ function updateCampaignUrl(campaignId: string): void {
 export function createAuthAndBootstrapMethods() {
   return {
     async init(this: SevaWorkspaceContext): Promise<void> {
+      this.$watch?.('actionMessage', (message: string) => this.scheduleActionMessage(message));
       const redirectError = consumeAuthRedirectError();
       const requestedCampaignId = rememberRequestedCampaignId();
       this.applyTextSizePreference();
@@ -274,6 +275,7 @@ export function createAuthAndBootstrapMethods() {
           .toLowerCase();
         this.isVolunteerModalOpen = false;
         this.restoreLeadSort();
+        this.restoreLeadQueueView();
         await this.openAuthenticatedWorkspace(requestedCampaignId);
       } catch (error) {
         this.authError = toAuthErrorMessage(
@@ -298,6 +300,7 @@ export function createAuthAndBootstrapMethods() {
           .toLowerCase();
         this.isVolunteerModalOpen = false;
         this.restoreLeadSort();
+        this.restoreLeadQueueView();
         await this.openAuthenticatedWorkspace(requestedCampaignId);
       } catch (error) {
         this.authError = toAuthErrorMessage(error, 'Sign in failed. Please try again.');
@@ -357,6 +360,11 @@ export function createAuthAndBootstrapMethods() {
       }
 
       this.leadSort = 'added-desc';
+      this.leadQueueView = 'cards';
+      this.resetTableInteraction();
+      this.tableEditDraft = null;
+      this.tableEditError = '';
+      this.tableSheetTrigger = null;
       this.bootstrapGeneration += 1;
       this.isLoadingBootstrap = false;
       this.isLoadingExistingLeads = false;

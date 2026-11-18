@@ -200,8 +200,10 @@ async function handleSession(req: ApiRequest, res: ApiResponse) {
   }
 
   try {
-    const { readSessionUser } = await loadSession();
+    const { readSessionUser, setSessionCookie } = await loadSession();
     const user = await readSessionUser(req);
+    res.setHeader('Cache-Control', 'no-store');
+    if (user) await setSessionCookie(res, user);
     return res.status(200).json({
       user: user
         ? {

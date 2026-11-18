@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createSheetsStore } from '../apps/seva.hub/server/sheets/store';
+import { DUPLICATE_LEAD_MOBILE_MESSAGE } from '../apps/seva.hub/shared/contracts/appContracts';
 import { DEFAULT_SHEET_LAYOUT } from '../apps/seva.hub/shared/contracts/sheetContract.mjs';
 import { mockBootstrapData } from '../apps/seva.hub/src/repositories/mock/mockData';
 import { MockLeadRepository } from '../apps/seva.hub/src/repositories/mock/mockLeadRepository';
@@ -40,7 +41,7 @@ const headers = [
   'createdAt'
 ];
 
-function fixture(includeCreatedAt = true, allowed = true) {
+function fixture(includeCreatedAt = true, allowed = true, otherMobile?: string) {
   const columns = includeCreatedAt ? [...headers] : headers.slice(0, -1);
   const row: Record<string, string> = {
     ...newLead,
@@ -60,7 +61,21 @@ function fixture(includeCreatedAt = true, allowed = true) {
             : [])
         ]
       : range.startsWith('Leads!')
-        ? [columns, columns.map((column) => row[column] || '')]
+        ? [
+            columns,
+            columns.map((column) => row[column] || ''),
+            ...(otherMobile
+              ? [
+                  columns.map((column) =>
+                    column === 'id'
+                      ? 'other-lead'
+                      : column === 'mobile'
+                        ? otherMobile
+                        : row[column] || ''
+                  )
+                ]
+              : [])
+          ]
         : []
   );
   const updateSheetValuesBatch = vi.fn(
@@ -106,6 +121,32 @@ function fixture(includeCreatedAt = true, allowed = true) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('Seva Hub storage enhancements', () => {
+  it('writes a normalized mobile correction without reusing another lead’s number', async () => {
+    const f = fixture(true, true, '9000000092');
+    const update = {
+      id: 'leadTest01AbcDefGhIJK',
+      campaignId,
+      campaignType: 'Leads' as const
+    };
+
+    await expect(
+      f.store.updateLeadForAuthorizedUser(user, {
+        ...update,
+        mobile: '+91 90000 00092'
+      })
+    ).rejects.toThrow(DUPLICATE_LEAD_MOBILE_MESSAGE);
+    expect(f.updateSheetValuesBatch).not.toHaveBeenCalled();
+
+    await f.store.updateLeadForAuthorizedUser(user, {
+      ...update,
+      mobile: '+91 90000 00093'
+    });
+    expect(f.updateSheetValuesBatch.mock.calls[0][1]).toContainEqual({
+      range: 'Leads!B2',
+      values: [['9000000093']]
+    });
+  });
+
   it.each(['all', campaignId])(
     'loads metadata for %s without reading any lead or member rows',
     async (scope) => {

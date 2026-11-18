@@ -16,6 +16,18 @@ const TEXT_SIZE_SCALE: Record<TextSize, string> = {
 
 export function createUiMethods() {
   return {
+    scheduleActionMessage(this: SevaWorkspaceContext, message: string): void {
+      if (this.actionMessageTimer !== null) {
+        clearTimeout(this.actionMessageTimer);
+        this.actionMessageTimer = null;
+      }
+      if (!message) return;
+      this.actionMessageText = message;
+      this.actionMessageTimer = setTimeout(() => {
+        this.actionMessage = '';
+        this.actionMessageTimer = null;
+      }, 8000);
+    },
     applyTextSizePreference(this: SevaWorkspaceContext): void {
       const scale = TEXT_SIZE_SCALE[this.textSize] || TEXT_SIZE_SCALE.normal;
       if (!document.documentElement) {
@@ -58,7 +70,7 @@ export function createUiMethods() {
       this.isFabOpen = !this.isFabOpen;
     },
     handleSelectionBarEscape(this: SevaWorkspaceContext): void {
-      if (this.isSelectionMode()) {
+      if (this.isSelectionMode() && !this.isOptionSheetOpen) {
         this.clearSelection();
         return;
       }
@@ -118,12 +130,16 @@ export function createUiMethods() {
         ).filter((value: string) => value !== qualityPlaceholder);
         const qualityIconMap: Record<string, string> = {};
         qualityValues.forEach((quality: string) => {
-          qualityIconMap[quality] = this.getQualityMeta(quality).icon;
+          qualityIconMap[quality] =
+            lead && this.leadQueueView === 'table'
+              ? this.getTableQualityIcon(quality)
+              : this.getQualityMeta(quality).icon;
         });
         this.optionSheetOptions = this.toOptionItems(qualityValues, qualityIconMap);
         this.currentOptionValue = lead ? lead.quality : this.createRecordDraft.quality;
       } else if (lead) {
-        this.optionSheetTitle = 'Update Status';
+        this.optionSheetTitle =
+          this.leadQueueView === 'table' ? 'Call response' : 'Update Status';
         const statusIconMap: Record<string, string> = {};
         const statusValues = (this.statusOptions || []).filter(
           (status: string) => status !== 'Response'
@@ -140,6 +156,12 @@ export function createUiMethods() {
     },
     closeOptionSheet(this: SevaWorkspaceContext): void {
       const editingCreateRecord = this.optionSheetMode === 'createQuality';
+      const editingTableDraft =
+        this.tableEditDraft && this.activeOptionLead === this.tableEditDraft;
+      const tableField =
+        this.optionSheetMode === 'quality'
+          ? 'tableEditQuality'
+          : 'tableEditStatus';
       this.isOptionSheetOpen = false;
       this.optionSheetMode = '';
       this.optionSheetTitle = '';
@@ -148,6 +170,8 @@ export function createUiMethods() {
       this.activeOptionLead = null;
       if (editingCreateRecord) {
         this.$nextTick?.(() => this.$refs?.createRecordQuality?.focus());
+      } else if (editingTableDraft) {
+        this.$nextTick?.(() => this.$refs?.[tableField]?.focus());
       }
     },
     async applyOptionSelection(
@@ -186,14 +210,10 @@ export function createUiMethods() {
         return;
       }
 
-      if (this.optionSheetMode === 'quality') {
-        this.activeOptionLead.quality = value;
-      } else {
-        this.activeOptionLead.status = value;
-      }
-
-      this.markLeadFilterDirty(this.activeOptionLead);
+      const lead = this.activeOptionLead;
+      const field = this.optionSheetMode === 'quality' ? 'quality' : 'status';
       this.closeOptionSheet();
+      await this.applyLeadPickerValue(lead, field, value);
     },
     openFollowUpPicker(this: SevaWorkspaceContext, lead: Lead): void {
       this.activateCard(lead);
@@ -207,27 +227,47 @@ export function createUiMethods() {
       });
     },
     closeFollowUpPicker(this: SevaWorkspaceContext): void {
+      const editingTableDraft =
+        this.tableEditDraft && this.activeFollowUpLead === this.tableEditDraft;
       this.isFollowUpModalOpen = false;
       this.activeFollowUpLead = null;
       this.followUpDraft = '';
+      if (editingTableDraft) {
+        this.$nextTick?.(() => this.$refs?.tableEditFollowUp?.focus());
+      }
     },
-    applyFollowUpPicker(this: SevaWorkspaceContext): void {
+    async applyFollowUpPicker(this: SevaWorkspaceContext): Promise<void> {
       if (!this.activeFollowUpLead || !this.followUpDraft) {
         this.closeFollowUpPicker();
         return;
       }
-      this.activeFollowUpLead.followUp = this.followUpDraft;
-      this.markLeadFilterDirty(this.activeFollowUpLead);
+      const lead = this.activeFollowUpLead;
+      const value = this.followUpDraft;
       this.closeFollowUpPicker();
+      await this.applyLeadPickerValue(lead, 'followUp', value);
     },
-    clearFollowUpPicker(this: SevaWorkspaceContext): void {
-      if (!this.activeFollowUpLead) {
-        this.closeFollowUpPicker();
-        return;
-      }
-      this.activeFollowUpLead.followUp = 'Follow-up';
-      this.markLeadFilterDirty(this.activeFollowUpLead);
+    async clearFollowUpPicker(this: SevaWorkspaceContext): Promise<void> {
+      const lead = this.activeFollowUpLead;
       this.closeFollowUpPicker();
+      if (lead) await this.applyLeadPickerValue(lead, 'followUp', 'Follow-up');
+    },
+    async applyLeadPickerValue(
+      this: SevaWorkspaceContext,
+      lead: Lead,
+      field: 'quality' | 'status' | 'followUp',
+      value: string
+    ): Promise<void> {
+      if (lead[field] !== value) {
+        lead[field] = value;
+        this.markLeadFilterDirty(lead);
+      }
+      if (
+        this.leadQueueView === 'table' &&
+        lead !== this.tableEditDraft &&
+        lead.isDirty
+      ) {
+        await this.commitLeadChanges(lead);
+      }
     },
     cleanPhone(this: SevaWorkspaceContext, phone: string): string {
       return String(phone || '').replace(/[^0-9]/g, '');

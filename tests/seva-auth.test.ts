@@ -2,8 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiRequest, ApiResponse } from '@aolt/core/api';
 import { SheetsRequestError } from '../apps/seva.hub/server/sheets/client.js';
 
-const { mockGetUserFromAuthCode, mockSetSessionCookie, mockStore } = vi.hoisted(() => ({
+const {
+  mockGetUserFromAuthCode,
+  mockReadSessionUser,
+  mockSetSessionCookie,
+  mockStore
+} = vi.hoisted(() => ({
   mockGetUserFromAuthCode: vi.fn(),
+  mockReadSessionUser: vi.fn(),
   mockSetSessionCookie: vi.fn(),
   mockStore: { isUserAllowed: vi.fn() }
 }));
@@ -16,7 +22,7 @@ vi.mock('../apps/seva.hub/server/auth/oauth.js', () => ({
 
 vi.mock('../apps/seva.hub/server/auth/session.js', () => ({
   clearSessionCookie: vi.fn(),
-  readSessionUser: vi.fn(),
+  readSessionUser: mockReadSessionUser,
   setSessionCookie: mockSetSessionCookie
 }));
 
@@ -137,4 +143,14 @@ describe('Google OAuth callback error distinction', () => {
     expect(headers.get('Location')).toBe('/seva');
     expect(mockSetSessionCookie).toHaveBeenCalledOnce();
   });
+});
+
+it('renews a valid Seva Hub session and prevents caching the response', async () => {
+  const user = { id: 'user-1', email: 'volunteer@example.com' };
+  mockReadSessionUser.mockResolvedValueOnce(user);
+  const { response, state, headers } = createResponse();
+  await handler({ method: 'GET', headers: {}, query: { action: 'session' } }, response);
+  expect(state).toMatchObject({ statusCode: 200, body: { user } });
+  expect(headers.get('Cache-Control')).toBe('no-store');
+  expect(mockSetSessionCookie).toHaveBeenCalledWith(response, user);
 });

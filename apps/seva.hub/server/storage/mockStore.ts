@@ -9,6 +9,7 @@ import {
   CreateCourseResponseSchema,
   CreateLeadRequestSchema,
   CreateLeadResponseSchema,
+  DUPLICATE_LEAD_MOBILE_MESSAGE,
   ImportLeadsResponseSchema,
   DeleteCourseRequestSchema,
   DeleteCourseResponseSchema,
@@ -187,6 +188,21 @@ export async function updateLeadForUser(
 
   if (!isAssignedToUser(store.leads[index], String(user.email || ''))) {
     throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
+  }
+
+  if (parsed.mobile !== undefined) {
+    if (
+      parsed.campaignType === 'Leads' &&
+      parsed.mobile !== normalizeIndianMobile(store.leads[index].mobile) &&
+      store.leads.some(
+        (lead, candidateIndex) =>
+          candidateIndex !== index &&
+          lead.campaignType === 'Leads' &&
+          normalizeIndianMobile(lead.mobile) === parsed.mobile
+      )
+    ) {
+      throw new Error(DUPLICATE_LEAD_MOBILE_MESSAGE);
+    }
   }
 
   store.leads[index] = {

@@ -1,3 +1,4 @@
+import { createTableViewMethods } from './tableView';
 import { createSortingMethods } from './sorting';
 import { createSevaWorkspaceInitialState } from './state';
 import { createAuthAndBootstrapMethods } from './authAndBootstrap';
@@ -140,6 +141,7 @@ export function sevaWorkspace(): SevaWorkspaceContext {
     ...createProgramMethods(),
     ...createDateAndFilterMethods(),
     ...createSortingMethods(),
+    ...createTableViewMethods(),
     ...createUiMethods(),
     ...createRecordActionMethods(),
     ...createCommunicationMethods(),

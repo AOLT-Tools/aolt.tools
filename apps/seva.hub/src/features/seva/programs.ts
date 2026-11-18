@@ -243,12 +243,16 @@ export function createProgramMethods() {
     },
     closeProgramEditor(this: SevaWorkspaceContext): void {
       const editingCreateRecord = this.programEditorTarget === 'createRecord';
+      const editingTableDraft =
+        this.tableEditDraft && this.activeProgramLead === this.tableEditDraft;
       this.isProgramEditorOpen = false;
       this.programEditorTarget = 'lead';
       this.activeProgramLead = null;
       this.programDraft = { wishlist: [], done: [] };
       if (editingCreateRecord) {
         this.$nextTick?.(() => this.$refs?.createRecordPrograms?.focus());
+      } else if (editingTableDraft) {
+        this.$nextTick?.(() => this.$refs?.tableEditPrograms?.focus());
       }
     },
     applyProgramEditor(this: SevaWorkspaceContext): void {

@@ -11,6 +11,7 @@ import {
   CreateCourseResponseSchema,
   CreateLeadRequestSchema,
   CreateLeadResponseSchema,
+  DUPLICATE_LEAD_MOBILE_MESSAGE,
   ImportLeadsResponseSchema,
   DeleteCourseRequestSchema,
   DeleteCourseResponseSchema,
@@ -882,6 +883,26 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       throw new Error('VOLUNTEER_NOT_ALLOWED');
     }
 
+    if (payload.mobile !== undefined) {
+      if (columns.mobile < 0) {
+        throw new Error('Lead sheet is missing a mobile column.');
+      }
+      if (
+        selectedCampaign.type === 'Leads' &&
+        payload.mobile !==
+          normalizeIndianMobile(getCell(target.values, columns.mobile)) &&
+        rows.some(
+          (row, index) =>
+            index > 0 &&
+            index + 1 !== target.rowNumber &&
+            normalizeIndianMobile(getCell(row, columns.mobile)) ===
+              payload.mobile
+        )
+      ) {
+        throw new Error(DUPLICATE_LEAD_MOBILE_MESSAGE);
+      }
+    }
+
     const targetRowNumber = target.rowNumber;
     const timestamp = now().toISOString();
     const updatesByColumn = new Map<number, string>();
@@ -891,6 +912,7 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       }
     };
     setUpdate(columns.name, payload.name);
+    setUpdate(columns.mobile, payload.mobile);
     setUpdate(columns.status, payload.status);
     setUpdate(columns.quality, payload.quality);
     setUpdate(columns.followUp, payload.followUp);

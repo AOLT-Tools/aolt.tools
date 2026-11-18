@@ -102,6 +102,9 @@ export function createCommunicationMethods() {
       const payload: UpdateLeadRequest = {
         id: String(lead.id || ''),
         name: snapshot.name,
+        ...(snapshot.mobile !== (lead._originalData?.mobile ?? lead.mobile)
+          ? { mobile: snapshot.mobile }
+          : {}),
         status: snapshot.status,
         quality: snapshot.quality,
         followUp: snapshot.followUp,

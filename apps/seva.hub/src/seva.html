@@ -12,6 +12,75 @@
         display: none !important;
       }
 
+      .lead-icon-column {
+        width: 44px;
+      }
+
+      .lead-table-row {
+        touch-action: pan-y;
+      }
+
+      .lead-table-row,
+      .lead-card {
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+
+      .lead-card input,
+      .lead-card textarea {
+        user-select: text;
+        -webkit-touch-callout: default;
+      }
+
+      .lead-row-action {
+        display: inline-flex;
+        width: 44px;
+        height: 44px;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        border-radius: 0.375rem;
+      }
+
+      button.lead-row-action:active {
+        background: #eef2ff;
+      }
+
+      button.lead-row-action:focus-visible {
+        outline: 2px solid #6366f1;
+        outline-offset: -2px;
+      }
+
+      .lead-bottom-sheet {
+        max-height: calc(100dvh - 1.5rem);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      }
+
+      .lead-edit-choice {
+        display: flex;
+        min-height: 44px;
+        width: 100%;
+        align-items: center;
+        gap: 0.375rem;
+        margin-top: 0.25rem;
+        padding: 0.375rem 0.625rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        background: #f8fafc;
+        color: #334155;
+        text-align: left;
+        font-size: 0.875rem;
+        overflow-wrap: anywhere;
+      }
+
+      @media (max-width: 359px) {
+        .lead-table-wrap {
+          margin-inline: -8px;
+        }
+      }
+
       .course-action-row {
         display: grid;
         grid-template-columns: repeat(5, 2rem);
@@ -41,18 +110,28 @@
   <body
     class="bg-slate-100 text-slate-800 font-sans antialiased max-w-md mx-auto min-h-screen flex flex-col"
   >
+    <svg class="absolute h-0 w-0" aria-hidden="true">
+      <symbol id="seva-whatsapp-icon" viewBox="0 0 16 16">
+        <path
+          d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93a7.898 7.898 0 0 0-2.327-5.607m-5.607 12.2a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.066-.315-.099-.445.099-.133.197-.513.646-.627.775-.116.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.984-.59-.525-.987-1.175-1.103-1.372-.116-.198-.013-.306.087-.404.09-.088.197-.232.296-.346.1-.116.133-.198.198-.33.066-.133.033-.248-.017-.347-.05-.099-.445-1.076-.611-1.47-.16-.389-.323-.335-.445-.34-.116-.006-.248-.006-.38-.006a.729.729 0 0 0-.529.248c-.182.198-.69.677-.69 1.654s.71 1.916.81 2.049c.098.132 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.15.906.129 1.248.08.38-.058 1.171-.48 1.338-.943.164-.462.164-.86.116-.943-.05-.082-.182-.132-.38-.23"
+        />
+      </symbol>
+    </svg>
     <!-- Main App Container managed by Alpine.js -->
-    <div x-data="sevaWorkspace()" x-init="init()" class="flex flex-col flex-1 pb-6">
+    <div x-data="sevaWorkspace()" class="flex flex-col flex-1 pb-6">
       <template x-teleport="body">
         <div
           x-cloak
           x-show="actionMessage"
-          x-transition.opacity
+          x-transition:enter.opacity.duration.150ms
+          x-transition:leave.opacity.duration.2000ms
+          @click.window.capture="dismissActionMessage()"
+          :class="!actionMessage && 'pointer-events-none'"
           role="status"
           class="fixed left-1/2 z-[100] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 text-xs text-emerald-700 shadow-lg backdrop-blur"
           style="bottom: calc(5.5rem + env(safe-area-inset-bottom))"
         >
-          <span x-text="actionMessage"></span>
+          <span x-text="actionMessageText"></span>
           <button
             type="button"
             @click="dismissActionMessage()"
@@ -68,6 +147,7 @@
       <header
         x-cloak
         x-show="authenticatedUser"
+        :inert="!!tableEditDraft"
         class="bg-white px-4 py-3 border-b border-slate-200 grid grid-cols-3 items-center sticky top-0 z-10 shadow-sm"
       >
         <div class="flex items-center">
@@ -301,7 +381,10 @@
             </button>
           </div>
 
-          <div class="grid grid-cols-2 gap-1 rounded-xl bg-slate-200/80 p-1">
+          <div
+            :inert="!!tableEditDraft"
+            class="grid grid-cols-2 gap-1 rounded-xl bg-slate-200/80 p-1"
+          >
             <button
               type="button"
               @click="switchWorkspaceView('callTracker')"
@@ -320,23 +403,55 @@
             </button>
           </div>
 
-          <div x-show="workspaceView === 'callTracker'" class="space-y-4">
+          <div
+            x-show="workspaceView === 'callTracker'"
+            :inert="!!tableEditDraft"
+            class="space-y-4"
+          >
             <!-- 2. CAMPAIGN OVERVIEW CARD -->
             <section
               class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3"
             >
-              <div class="flex justify-between items-center">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400"
+              <div
+                class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1"
+              >
+                <span
+                  class="text-xs font-bold uppercase tracking-wider text-slate-400"
                   >Seva Overview</span
                 >
-                <span
-                  class="text-xs px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium flex items-center gap-1"
-                >
+                <div class="ml-auto flex shrink-0 items-center gap-1.5">
                   <span
-                    class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"
-                  ></span>
-                  Active
-                </span>
+                    class="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                  >
+                    <span
+                      class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"
+                    ></span>
+                    Active
+                  </span>
+                  <button
+                    type="button"
+                    x-ref="queueViewButton"
+                    class="group inline-flex h-[44px] w-[44px] shrink-0 items-center justify-end rounded-md text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-500"
+                    :aria-label="leadQueueView === 'cards' ? 'Switch to table view' : 'Switch to card view'"
+                    @click="selectLeadQueueView(leadQueueView === 'cards' ? 'table' : 'cards')"
+                  >
+                    <span
+                      class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-slate-50 group-active:bg-indigo-50"
+                      aria-hidden="true"
+                    >
+                      <i
+                        x-show="leadQueueView === 'cards'"
+                        data-lucide="table-2"
+                        class="h-[18px] w-[18px]"
+                      ></i>
+                      <i
+                        x-show="leadQueueView === 'table'"
+                        data-lucide="layout-grid"
+                        class="h-[18px] w-[18px]"
+                      ></i>
+                    </span>
+                  </button>
+                </div>
               </div>
 
               <div class="flex items-stretch gap-2">
@@ -530,13 +645,280 @@
                 ></span>
               </div>
 
+              <template
+                x-if="leadQueueView === 'table' && visibleLeads().length"
+              >
+                <div
+                  class="lead-table-wrap overflow-hidden rounded-md border border-slate-200 bg-white"
+                >
+                  <table
+                    class="w-full table-fixed text-left"
+                    :aria-label="getCampaignUiMeta().queueTitle"
+                  >
+                    <colgroup>
+                      <col class="lead-icon-column" />
+                      <col />
+                      <col class="lead-icon-column" />
+                      <col class="lead-icon-column" />
+                      <col class="lead-icon-column" />
+                      <col class="lead-icon-column" />
+                    </colgroup>
+                    <thead
+                      class="bg-slate-50 text-center text-[11px] text-slate-600"
+                    >
+                      <tr>
+                        <th scope="col" class="py-1.5">
+                          <span x-show="!isSelectionMode()">
+                            <i
+                              data-lucide="star"
+                              class="mx-auto h-4 w-4"
+                              aria-hidden="true"
+                            ></i>
+                            <span
+                              class="sr-only"
+                              x-text="getQualityFieldLabel()"
+                            ></span>
+                          </span>
+                          <span x-show="isSelectionMode()">Select</span>
+                        </th>
+                        <th scope="col" class="pl-1 text-left" aria-label="Name">
+                          <div class="flex items-center justify-between">
+                            <span>Name</span>
+                            <button
+                              type="button"
+                              class="inline-flex h-8 w-6 shrink-0 items-center justify-center rounded-md text-indigo-700 active:bg-indigo-50 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                              :aria-label="areAllVisibleNotesExpanded() ? 'Collapse all notes' : 'Expand all notes'"
+                              :disabled="!hasVisibleLeadNotes()"
+                              @click="toggleAllVisibleNotes()"
+                            >
+                              <i data-lucide="notebook-text" x-show="!areAllVisibleNotesExpanded()" class="h-4 w-4" aria-hidden="true"></i>
+                              <i data-lucide="book-open-text" x-show="areAllVisibleNotesExpanded()" class="h-4 w-4" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                        </th>
+                        <th scope="col">
+                          <i
+                            data-lucide="phone"
+                            class="mx-auto h-4 w-4"
+                            aria-hidden="true"
+                          ></i>
+                          <span class="sr-only">Call</span>
+                        </th>
+                        <th scope="col">
+                          <svg
+                            class="mx-auto h-4 w-4"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <use href="#seva-whatsapp-icon"></use>
+                          </svg>
+                          <span class="sr-only">WhatsApp</span>
+                        </th>
+                        <th scope="col">
+                          <i
+                            data-lucide="phone-call"
+                            class="mx-auto h-4 w-4"
+                            aria-hidden="true"
+                          ></i>
+                          <span class="sr-only">Call response</span>
+                        </th>
+                        <th scope="col">
+                          <i
+                            data-lucide="calendar"
+                            class="mx-auto h-4 w-4"
+                            aria-hidden="true"
+                          ></i>
+                          <span class="sr-only">Follow-up</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <template
+                      x-for="lead in visibleLeads()"
+                      :key="getLeadKey(lead)"
+                    >
+                      <tbody
+                        x-id="['lead-notes']"
+                        class="lead-table-row border-t border-slate-200"
+                        :class="isLeadSelected(lead) ? 'bg-indigo-100' : (highlightedLeadId === getLeadKey(lead) ? 'bg-indigo-50' : '')"
+                        :data-card-id="getLeadKey(lead)"
+                        @pointerdown="handleCardPointerDown($event, lead)"
+                        @pointermove="handleCardPointerMove($event)"
+                        @pointerup="cancelCardLongPress()"
+                        @pointerleave="cancelCardLongPress()"
+                        @pointercancel="cancelCardLongPress()"
+                        @click.capture="handleTableLeadClick($event, lead)"
+                        @contextmenu.prevent
+                      >
+                        <tr class="text-center">
+                          <td>
+                            <button
+                              x-show="!isSelectionMode()"
+                              type="button"
+                              class="lead-row-action text-lg text-slate-600"
+                              :aria-label="lead.name + ': ' + getQualityFieldLabel() + ' — ' + (lead.quality === getQualityFieldLabel() ? 'Unset' : lead.quality)"
+                              @click="openOptionSheet('quality', lead)"
+                            >
+                              <span
+                                aria-hidden="true"
+                                x-text="getTableQualityIcon(lead.quality)"
+                              ></span>
+                            </button>
+                            <label
+                              x-show="isSelectionMode()"
+                              data-row-checkbox
+                              class="lead-row-action"
+                            >
+                              <input
+                                type="checkbox"
+                                class="h-4 w-4 accent-indigo-600"
+                                :aria-label="'Select ' + lead.name"
+                                :checked="isLeadSelected(lead)"
+                                :disabled="isBulkActionPending"
+                                @change="toggleLeadSelection(lead)"
+                              />
+                            </label>
+                          </td>
+                          <td>
+                            <div class="flex items-center">
+                              <button
+                                type="button"
+                                class="flex min-h-[44px] min-w-0 flex-1 items-center rounded-md py-0.5 pl-1 pr-0.5 text-left text-sm font-semibold leading-tight text-indigo-700 active:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                                :aria-label="'Edit ' + lead.name + (lead.lastUpdated === 'Save failed' ? ' (unsaved changes)' : '')"
+                                :tabindex="isSelectionMode() ? -1 : 0"
+                                @click="openLeadEdit(lead, $event.currentTarget)"
+                              >
+                                <span
+                                  class="line-clamp-2 break-words [overflow-wrap:anywhere]"
+                                  x-text="lead.name"
+                                ></span>
+                                <i
+                                  x-show="lead.lastUpdated === 'Save failed'"
+                                  data-lucide="triangle-alert"
+                                  class="ml-1 h-3.5 w-3.5 shrink-0 text-rose-600"
+                                  aria-hidden="true"
+                                ></i>
+                              </button>
+                              <button
+                                x-show="lead.notes.trim()"
+                                type="button"
+                                class="inline-flex min-h-[44px] w-6 shrink-0 items-center justify-center rounded-md active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
+                                :class="isLeadNoteExpanded(lead) ? 'text-indigo-700' : 'text-slate-600'"
+                                :tabindex="isSelectionMode() ? -1 : 0"
+                                :aria-label="'Notes for ' + lead.name"
+                                :aria-expanded="isLeadNoteExpanded(lead)"
+                                :aria-controls="$id('lead-notes')"
+                                @click="toggleLeadNotes(lead)"
+                              >
+                                <i
+                                  data-lucide="sticky-note"
+                                  class="h-4 w-4"
+                                  aria-hidden="true"
+                                ></i>
+                              </button>
+                            </div>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              class="lead-row-action text-indigo-700 disabled:opacity-40"
+                              :tabindex="isSelectionMode() ? -1 : 0"
+                              :disabled="!isSelectionMode() && !cleanPhone(lead.mobile)"
+                              :aria-label="'Call ' + lead.name"
+                              @click="dialLead(lead)"
+                            >
+                              <i
+                                data-lucide="phone"
+                                class="h-[18px] w-[18px]"
+                                aria-hidden="true"
+                              ></i>
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              class="lead-row-action text-emerald-700 disabled:opacity-40"
+                              :tabindex="isSelectionMode() ? -1 : 0"
+                              :disabled="!isSelectionMode() && !canOpenWhatsapp(lead)"
+                              :aria-label="'WhatsApp ' + lead.name"
+                              @click="openWhatsappForLead(lead)"
+                            >
+                              <svg
+                                data-icon="whatsapp"
+                                class="h-[18px] w-[18px]"
+                                fill="currentColor"
+                                aria-hidden="true"
+                              >
+                                <use href="#seva-whatsapp-icon"></use>
+                              </svg>
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              class="lead-row-action text-lg text-slate-600"
+                              :tabindex="isSelectionMode() ? -1 : 0"
+                              :aria-label="lead.name + ': Call response — ' + (lead.status === 'Response' ? 'No response recorded' : lead.status)"
+                              @click="openOptionSheet('status', lead)"
+                            >
+                              <span
+                                aria-hidden="true"
+                                x-text="lead.status === 'Response' ? '—' : getStatusMeta(lead.status).icon"
+                              ></span>
+                            </button>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              class="lead-row-action"
+                              :tabindex="isSelectionMode() ? -1 : 0"
+                              :aria-label="lead.name + ': ' + (lead._followUpTs === null ? 'Set follow-up' : 'Follow-up ' + getTableFollowUpState(lead) + ', ' + formatShortDate(lead.followUp))"
+                              @click="openFollowUpPicker(lead)"
+                            >
+                              <span
+                                x-show="getTableFollowUpState(lead) === 'none'"
+                                class="text-lg text-slate-600"
+                                aria-hidden="true"
+                                >—</span
+                              >
+                              <i
+                                x-show="getTableFollowUpState(lead) === 'due'"
+                                data-lucide="calendar-clock"
+                                class="h-[18px] w-[18px] text-rose-600"
+                                aria-hidden="true"
+                              ></i>
+                              <i
+                                x-show="getTableFollowUpState(lead) === 'upcoming'"
+                                data-lucide="calendar-check"
+                                class="h-[18px] w-[18px] text-amber-700"
+                                aria-hidden="true"
+                              ></i>
+                            </button>
+                          </td>
+                        </tr>
+                        <tr
+                          :id="$id('lead-notes')"
+                          x-show="isLeadNoteExpanded(lead) && lead.notes.trim()"
+                        >
+                          <td colspan="6">
+                            <p
+                              class="whitespace-pre-wrap px-3 pb-2 text-left text-xs leading-normal text-slate-600 [overflow-wrap:anywhere]"
+                              x-text="lead.notes.trim()"
+                            ></p>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </template>
+                  </table>
+                </div>
+              </template>
+
               <!-- Reusable Lead Card Loop -->
               <template
-                x-for="lead in visibleLeads()"
+                x-for="lead in (leadQueueView === 'cards' ? visibleLeads() : [])"
                 :key="getLeadKey(lead) + '|' + lead.programSummary"
               >
                 <div
-                  class="bg-white rounded-xl shadow-sm border p-3.5 space-y-2.5 transition-colors touch-manipulation"
+                  class="lead-card bg-white rounded-xl shadow-sm border p-3.5 space-y-2.5 transition-colors touch-manipulation"
                   :class="isLeadSelected(lead) ? 'border-indigo-600 bg-indigo-50 ring-2 ring-indigo-300 shadow-sm' : (activeCardId === getLeadKey(lead) ? 'border-indigo-500 bg-indigo-50/50 ring-2 ring-indigo-200 shadow-sm' : 'border-slate-200')"
                   :data-card-id="getLeadKey(lead)"
                   @pointerdown="handleCardPointerDown($event, lead)"
@@ -546,6 +928,7 @@
                   @pointercancel="cancelCardLongPress()"
                   @click.capture="handleCardClick($event, lead)"
                   :aria-selected="isLeadSelected(lead)"
+                  @contextmenu="handleCardContextMenu($event)"
                 >
                   <!-- Top Row: Quality, Follow-up, Last Updated -->
                   <div class="flex justify-between items-start gap-2 text-xs">
@@ -590,10 +973,6 @@
                       </span>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
-                      <span
-                        class="text-[0.625rem] text-slate-400"
-                        x-text="formatShortDate(lead.lastUpdated, 'Just now')"
-                      ></span>
                       <button
                         type="button"
                         x-show="lead.isDirty"
@@ -613,6 +992,23 @@
                         title="Save changes"
                       >
                         <span aria-hidden="true">✓</span>
+                      </button>
+                      <span
+                        class="text-[0.625rem] text-slate-400"
+                        x-text="formatShortDate(lead.lastUpdated, 'Just now')"
+                      ></span>
+                      <button
+                        x-show="!isSelectionMode()"
+                        type="button"
+                        class="lead-row-action -mr-2 shrink-0 text-slate-700"
+                        :aria-label="'Edit ' + lead.name"
+                        @click="openLeadEdit(lead, $event.currentTarget)"
+                      >
+                        <i
+                          data-lucide="ellipsis-vertical"
+                          class="h-5 w-5"
+                          aria-hidden="true"
+                        ></i>
                       </button>
                     </div>
                   </div>
@@ -697,9 +1093,7 @@
                           class="w-4 h-4"
                           aria-hidden="true"
                         >
-                          <path
-                            d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93a7.898 7.898 0 0 0-2.327-5.607m-5.607 12.2a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.066-.315-.099-.445.099-.133.197-.513.646-.627.775-.116.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.984-.59-.525-.987-1.175-1.103-1.372-.116-.198-.013-.306.087-.404.09-.088.197-.232.296-.346.1-.116.133-.198.198-.33.066-.133.033-.248-.017-.347-.05-.099-.445-1.076-.611-1.47-.16-.389-.323-.335-.445-.34-.116-.006-.248-.006-.38-.006a.729.729 0 0 0-.529.248c-.182.198-.69.677-.69 1.654s.71 1.916.81 2.049c.098.132 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.15.906.129 1.248.08.38-.058 1.171-.48 1.338-.943.164-.462.164-.86.116-.943-.05-.082-.182-.132-.38-.23"
-                          />
+                          <use href="#seva-whatsapp-icon"></use>
                         </svg>
                       </button>
                       <button
@@ -861,6 +1255,7 @@
             class="fixed z-30 left-1/2 -translate-x-1/2 w-full max-w-md px-4 pointer-events-none"
             style="bottom: max(1rem, env(safe-area-inset-bottom))"
             x-show="authenticatedUser && !isVolunteerModalOpen && workspaceView === 'callTracker'"
+            :inert="!!tableEditDraft"
             @keydown.escape.window="handleSelectionBarEscape()"
           >
             <div
@@ -1255,11 +1650,172 @@
             </form>
           </div>
 
+          <!-- Shared lead edit form -->
+          <div
+            x-show="tableEditDraft"
+            :inert="isOptionSheetOpen || isFollowUpModalOpen || isProgramEditorOpen"
+            class="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/40 p-3 sm:items-center"
+            @click.self="closeLeadEdit()"
+            @keydown.escape.window="closeLeadEditOnEscape()"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="table-edit-title"
+            tabindex="-1"
+            x-ref="tableEditSheet"
+          >
+            <template x-if="tableEditDraft">
+              <form
+                class="lead-bottom-sheet w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-xl"
+                @submit.prevent="saveTableLeadEdit()"
+              >
+                <fieldset
+                  :disabled="isTableEditSaving"
+                  class="min-w-0 space-y-3"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <h3
+                      id="table-edit-title"
+                      class="text-base font-semibold text-slate-900"
+                      x-text="campaignType === 'Members' ? 'Edit member' : 'Edit lead'"
+                    ></h3>
+                    <button
+                      type="button"
+                      class="lead-row-action shrink-0 text-slate-600"
+                      aria-label="Close edit"
+                      @click="closeLeadEdit()"
+                    >
+                      <i data-lucide="x" class="h-5 w-5" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div class="min-w-0">
+                      <span class="block text-xs font-medium text-slate-700"
+                        >Call response</span
+                      >
+                      <button
+                        type="button"
+                        class="lead-edit-choice"
+                        x-ref="tableEditStatus"
+                        @click="openOptionSheet('status', tableEditDraft)"
+                        :aria-label="'Call response: ' + tableEditDraft.status"
+                        x-text="getStatusMeta(tableEditDraft.status).icon + ' ' + tableEditDraft.status"
+                      ></button>
+                    </div>
+                    <div class="min-w-0">
+                      <span
+                        class="block text-xs font-medium text-slate-700"
+                        x-text="getQualityFieldLabel()"
+                      ></span>
+                      <button
+                        type="button"
+                        class="lead-edit-choice"
+                        x-ref="tableEditQuality"
+                        @click="openOptionSheet('quality', tableEditDraft)"
+                        :aria-label="getQualityFieldLabel() + ': ' + tableEditDraft.quality"
+                        x-text="(leadQueueView === 'table' ? getTableQualityIcon(tableEditDraft.quality) : getQualityMeta(tableEditDraft.quality).icon) + ' ' + tableEditDraft.quality"
+                      ></button>
+                    </div>
+                  </div>
+                  <label class="block text-xs font-medium text-slate-700">
+                    Name
+                    <input
+                      type="text"
+                      required
+                      x-ref="tableEditName"
+                      x-model="tableEditDraft.name"
+                      class="mt-1 min-h-[44px] w-full rounded-lg border border-slate-200 px-3 text-base text-slate-900 focus:border-indigo-500 focus:outline-none"
+                    />
+                  </label>
+                  <label class="block text-xs font-medium text-slate-700">
+                    Mobile number
+                    <input
+                      type="tel"
+                      autocomplete="tel"
+                      x-ref="tableEditMobile"
+                      x-model="tableEditDraft.mobile"
+                      class="mt-1 min-h-[44px] w-full rounded-lg border border-slate-200 px-3 text-base text-slate-900 focus:border-indigo-500 focus:outline-none"
+                    />
+                  </label>
+                  <div>
+                    <span class="block text-xs font-medium text-slate-700"
+                      >Follow-up</span
+                    >
+                    <button
+                      type="button"
+                      class="lead-edit-choice"
+                      x-ref="tableEditFollowUp"
+                      @click="openFollowUpPicker(tableEditDraft)"
+                    >
+                      <i
+                        data-lucide="calendar"
+                        class="h-4 w-4 shrink-0"
+                        aria-hidden="true"
+                      ></i>
+                      <span
+                        x-text="tableEditDraft._followUpTs === null ? 'Set follow-up' : formatShortDate(tableEditDraft.followUp)"
+                      ></span>
+                    </button>
+                  </div>
+                  <label class="block text-xs font-medium text-slate-700">
+                    Notes
+                    <textarea
+                      rows="3"
+                      x-model="tableEditDraft.notes"
+                      placeholder="Add notes…"
+                      class="mt-1 w-full rounded-lg border border-slate-200 p-2 text-base text-slate-900 focus:border-indigo-500 focus:outline-none"
+                    ></textarea>
+                  </label>
+                  <button
+                    type="button"
+                    x-show="shouldShowProgramEditor()"
+                    x-ref="tableEditPrograms"
+                    class="lead-edit-choice"
+                    @click="openProgramEditor(tableEditDraft)"
+                    x-text="tableEditDraft.programSummary"
+                  ></button>
+                  <p
+                    class="text-xs text-slate-500"
+                    x-text="'Last updated: ' + formatShortDate(tableEditDraft.lastSavedAt, '—')"
+                  ></p>
+                  <p
+                    x-show="tableEditError"
+                    role="alert"
+                    class="text-sm text-rose-700"
+                    x-text="tableEditError"
+                  ></p>
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      x-show="hasUnsavedLeadEdit()"
+                      class="min-h-[44px] rounded-lg px-2 text-xs font-medium text-rose-700"
+                      @click="discardTableLeadChanges()"
+                    >
+                      Discard unsaved changes
+                    </button>
+                    <button
+                      type="button"
+                      class="min-h-[44px] rounded-lg border border-slate-200 px-3 text-sm text-slate-700"
+                      @click="closeLeadEdit()"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      class="min-h-[44px] rounded-lg bg-indigo-700 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                      x-text="isTableEditSaving ? 'Saving…' : 'Save'"
+                    ></button>
+                  </div>
+                </fieldset>
+              </form>
+            </template>
+          </div>
+
           <!-- Follow-up Date Time Popup -->
           <div
             x-show="isFollowUpModalOpen"
             x-transition.opacity
-            class="fixed inset-0 z-30 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            class="fixed inset-0 bg-slate-900/40 flex items-end sm:items-center justify-center p-3"
+            :class="tableEditDraft ? 'z-50' : 'z-30'"
             @click.self="closeFollowUpPicker()"
             @keydown.escape.window="closeFollowUpPicker()"
             role="dialog"
@@ -1267,7 +1823,7 @@
             aria-labelledby="followup-modal-title"
           >
             <div
-              class="w-full max-w-xs bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-3"
+              class="w-full max-w-xs bg-white rounded-xl shadow-lg border border-slate-200 lead-bottom-sheet p-3 space-y-3"
             >
               <div
                 id="followup-modal-title"
@@ -1279,27 +1835,27 @@
                 x-ref="followUpInput"
                 type="datetime-local"
                 x-model="followUpDraft"
-                class="w-full text-sm border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                class="w-full min-h-[44px] text-base border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
               <div class="flex justify-end gap-2">
                 <button
                   type="button"
                   @click="clearFollowUpPicker()"
-                  class="px-3 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-600 bg-white"
+                  class="min-h-[44px] px-3 py-1.5 text-xs rounded-lg border border-rose-200 text-rose-600 bg-white"
                 >
                   Clear
                 </button>
                 <button
                   type="button"
                   @click="closeFollowUpPicker()"
-                  class="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
+                  class="min-h-[44px] px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   @click="applyFollowUpPicker()"
-                  class="px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white"
+                  class="min-h-[44px] px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white"
                 >
                   Apply
                 </button>
@@ -1547,13 +2103,18 @@
             x-ref="optionSheet"
           >
             <div
-              class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-2"
+              class="lead-bottom-sheet w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-2"
             >
               <div
                 id="option-sheet-title"
                 class="text-sm font-semibold text-slate-800"
                 x-text="optionSheetTitle"
               ></div>
+              <p
+                x-show="leadQueueView === 'table' && activeOptionLead && (optionSheetMode === 'quality' || optionSheetMode === 'status')"
+                class="text-xs text-slate-600"
+                x-text="'Current: ' + (currentOptionValue === 'Response' ? 'No response recorded' : currentOptionValue)"
+              ></p>
               <div
                 class="space-y-2"
                 :class="optionSheetMode === 'reassignVolunteer' ? 'max-h-[15rem] overflow-y-auto pr-1' : ''"
@@ -1562,6 +2123,7 @@
                   <button
                     type="button"
                     @click="applyOptionSelection(item.value)"
+                    :aria-pressed="currentOptionValue === item.value"
                     class="w-full min-h-11 text-left px-2 py-2 rounded-lg text-sm border"
                     :class="currentOptionValue === item.value ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700'"
                     x-text="item.icon ? (item.icon + ' ' + item.label) : item.label"
@@ -1585,7 +2147,7 @@
             x-ref="programEditor"
           >
             <div
-              class="w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-3"
+              class="lead-bottom-sheet w-full max-w-sm bg-white rounded-xl shadow-lg border border-slate-200 p-3 space-y-3"
             >
               <div
                 id="program-editor-title"
@@ -1605,7 +2167,7 @@
                       type="button"
                       @click="toggleProgramSelection('wishlist', program.code)"
                       :aria-pressed="isProgramSelected('wishlist', program.code)"
-                      class="px-2 py-1 rounded-full text-[11px] border"
+                      class="min-h-[44px] min-w-[44px] px-2 py-1 rounded-full text-xs border"
                       :class="isProgramSelected('wishlist', program.code) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-700 border-slate-200'"
                       x-text="program.code"
                     ></button>
@@ -1627,7 +2189,7 @@
                       type="button"
                       @click="toggleProgramSelection('done', program.code)"
                       :aria-pressed="isProgramSelected('done', program.code)"
-                      class="px-2 py-1 rounded-full text-[11px] border"
+                      class="min-h-[44px] min-w-[44px] px-2 py-1 rounded-full text-xs border"
                       :class="isProgramSelected('done', program.code) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-700 border-slate-200'"
                       x-text="program.code"
                     ></button>
@@ -1639,14 +2201,14 @@
                 <button
                   type="button"
                   @click="closeProgramEditor()"
-                  class="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
+                  class="min-h-[44px] px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 bg-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   @click="applyProgramEditor()"
-                  class="px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white"
+                  class="min-h-[44px] px-3 py-1.5 text-xs rounded-lg bg-indigo-600 text-white"
                 >
                   Apply
                 </button>

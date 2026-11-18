@@ -1,6 +1,8 @@
+import { decodeJwt } from 'jose';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { VercelRequest } from '@vercel/node';
 import { z } from 'zod';
+import { createSessionToken as createSevaSessionToken } from '../apps/seva.hub/server/auth/session';
 import { __resetEnvForTests } from '@aolt/core/env';
 import {
   assertMutationRequest,
@@ -16,6 +18,21 @@ beforeEach(() => {
 });
 
 describe('signed sessions', () => {
+  it('issues Seva Hub tokens without expiry while standard app tokens expire', async () => {
+    process.env.SESSION_SECRET =
+      'seva-test-session-secret-with-more-than-32-characters';
+    try {
+      const user = { id: 'subject', email: 'volunteer@example.com', name: 'Volunteer' };
+      expect(decodeJwt(await createSevaSessionToken(user))).not.toHaveProperty('exp');
+      expect(decodeJwt(await createSessionToken(user))).toHaveProperty(
+        'exp',
+        expect.any(Number)
+      );
+    } finally {
+      delete process.env.SESSION_SECRET;
+    }
+  });
+
   it('round-trips a signed actor without exposing a server-side session store', async () => {
     const token = await createSessionToken(
       {

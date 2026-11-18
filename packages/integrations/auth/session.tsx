@@ -33,6 +33,7 @@ export type JwtSessionManagerOptions<TUser extends JwtSessionUser> = {
   getSecrets: () => JwtSessionSecret | readonly JwtSessionSecret[];
   getCookieName: () => string;
   getTtlSeconds: () => number;
+  expireToken?: boolean;
   secureCookie?: () => boolean;
   sameSite?: 'Lax' | 'Strict' | 'None';
   path?: string;
@@ -74,9 +75,11 @@ export function createJwtSessionManager<TUser extends JwtSessionUser>(
         ...(options.keyId ? { kid: options.keyId } : {})
       })
       .setSubject(parsed.id)
-      .setIssuedAt(now)
-      .setExpirationTime(now + options.getTtlSeconds());
+      .setIssuedAt(now);
 
+    if (options.expireToken !== false) {
+      token = token.setExpirationTime(now + options.getTtlSeconds());
+    }
     if (options.issuer) {
       token = token.setIssuer(options.issuer);
     }

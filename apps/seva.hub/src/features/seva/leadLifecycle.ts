@@ -43,6 +43,7 @@ function cloneSnapshot(snapshot: LeadSnapshot): LeadSnapshot {
 function snapshotsMatch(left: LeadSnapshot, right: LeadSnapshot): boolean {
   return (
     left.name === right.name &&
+    left.mobile === right.mobile &&
     left.quality === right.quality &&
     left.followUp === right.followUp &&
     left.status === right.status &&
@@ -110,6 +111,7 @@ export function createLeadLifecycleMethods() {
     createLeadSnapshot(this: SevaWorkspaceContext, lead: Lead): LeadSnapshot {
       return {
         name: lead.name || '',
+        mobile: lead.mobile || '',
         quality: lead.quality || '',
         followUp: lead.followUp || '',
         status: lead.status || '',
@@ -132,7 +134,7 @@ export function createLeadLifecycleMethods() {
       );
     },
     activateCard(this: SevaWorkspaceContext, lead: Lead | null): void {
-      if (!lead) {
+      if (!lead || lead === this.tableEditDraft) {
         return;
       }
       const leadKey = this.getLeadKey(lead);
@@ -165,7 +167,7 @@ export function createLeadLifecycleMethods() {
     },
     handleGlobalPointerDown(this: SevaWorkspaceContext, event: PointerEvent): void {
       const target = event.target;
-      if (!(target instanceof Element)) {
+      if (this.tableEditDraft || !(target instanceof Element)) {
         return;
       }
 
@@ -240,6 +242,37 @@ export function createLeadLifecycleMethods() {
       }
       return succeeded;
     },
+    async commitLeadDraft(
+      this: SevaWorkspaceContext,
+      lead: Lead,
+      draft: Lead
+    ): Promise<boolean> {
+      const original = lead._originalData ?? this.createLeadSnapshot(lead);
+      draft._originalData = original;
+      const snapshot = this.createLeadSnapshot(draft);
+      draft.isDirty = lead.isDirty || !snapshotsMatch(original, snapshot);
+      if (!draft.isDirty) return true;
+      if (!(await this.commitLeadChanges(draft))) return false;
+
+      // Apply the saved fields to the existing row so both layouts share the result.
+      this.applyLeadSnapshot(lead, snapshot);
+      lead._originalData = cloneSnapshot(snapshot);
+      lead.lastUpdated = draft.lastUpdated;
+      lead.lastSavedAt = draft.lastSavedAt;
+      lead.isDirty = false;
+      return true;
+    },
+    applyLeadSnapshot(
+      this: SevaWorkspaceContext,
+      lead: Lead,
+      snapshot: LeadSnapshot
+    ): void {
+      Object.assign(lead, snapshot, {
+        wishlistPrograms: this.normalizePrograms(snapshot.wishlistPrograms),
+        donePrograms: this.normalizePrograms(snapshot.donePrograms)
+      });
+      this.normalizeLeadDerivedFields(lead);
+    },
     async flushPendingSaves(this: SevaWorkspaceContext): Promise<boolean> {
       for (;;) {
         const dirtyLeads = (this.leads || []).filter((lead: Lead) => lead.isDirty);
@@ -269,15 +302,11 @@ export function createLeadLifecycleMethods() {
       const leadKey = this.getLeadKey(lead);
       const hasPendingSave = Boolean(getSaveQueues(this).get(leadKey)?.running);
 
-      lead.name = snapshot.name;
-      lead.quality = snapshot.quality;
-      lead.followUp = snapshot.followUp;
-      lead.status = snapshot.status;
-      lead.notes = snapshot.notes;
-      lead.wishlistPrograms = this.normalizePrograms(snapshot.wishlistPrograms);
-      lead.donePrograms = this.normalizePrograms(snapshot.donePrograms);
-      this.normalizeLeadDerivedFields(lead);
+      this.applyLeadSnapshot(lead, snapshot);
       lead.isEditingName = false;
+      if (lead.lastUpdated === 'Save failed') {
+        lead.lastUpdated = lead.lastSavedAt || 'Just now';
+      }
       lead.isDirty = hasPendingSave;
       if (hasPendingSave) {
         void this.commitLeadChanges(lead);

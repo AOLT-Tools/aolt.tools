@@ -9,6 +9,7 @@ import {
   BootstrapResponseSchema,
   CreateLeadRequestSchema,
   CreateLeadResponseSchema,
+  DUPLICATE_LEAD_MOBILE_MESSAGE,
   ImportLeadsRequestSchema,
   ImportLeadsResponseSchema,
   DeleteLeadRequestSchema,
@@ -155,6 +156,25 @@ export class MockLeadRepository implements LeadRepository {
       throw new Error(
         'Lead not found for type: ' + parsed.campaignType + '/' + parsed.id
       );
+    }
+
+    if (parsed.mobile !== undefined) {
+      const target = this.leads[index];
+      if (normalizeEmail(target.assignedVolunteerEmail) !== normalizeEmail(mockBootstrapData.user.email)) {
+        throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
+      }
+      if (
+        parsed.campaignType === 'Leads' &&
+        parsed.mobile !== normalizeIndianMobile(target.mobile) &&
+        this.leads.some(
+          (lead, candidateIndex) =>
+            candidateIndex !== index &&
+            lead.campaignType === 'Leads' &&
+            normalizeIndianMobile(lead.mobile) === parsed.mobile
+        )
+      ) {
+        throw new Error(DUPLICATE_LEAD_MOBILE_MESSAGE);
+      }
     }
 
     this.leads[index] = {

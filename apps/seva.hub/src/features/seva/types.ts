@@ -40,6 +40,7 @@ export interface CourseDraft {
   imagePreviewUrl: string;
 }
 
+export type LeadQueueView = 'cards' | 'table';
 export type WorkspaceView = 'callTracker' | 'courseManagement';
 export type CoursePickerMode = 'whatsapp' | 'imageShare';
 export type TextSize = 'normal' | 'large' | 'extraLarge';
@@ -60,6 +61,7 @@ export interface AssignMembersDraft {
 
 export interface LeadSnapshot {
   name: string;
+  mobile: string;
   quality: string;
   followUp: string;
   status: string;
@@ -103,6 +105,13 @@ export interface SevaWorkspaceState {
   existingLeadsError: string;
   bootstrapGeneration: number;
   leadSort: string;
+  leadQueueView: LeadQueueView;
+  highlightedLeadId: string;
+  expandedLeadNotes: Set<string>;
+  tableEditDraft: Lead | null;
+  isTableEditSaving: boolean;
+  tableEditError: string;
+  tableSheetTrigger: HTMLElement | null;
   campaigns: Campaign[];
   selectedCampaignId: string;
   selectedCampaign: Campaign | null;
@@ -116,6 +125,8 @@ export interface SevaWorkspaceState {
   authenticatedUser: AuthenticatedUser | null;
   authError: string;
   actionMessage: string;
+  actionMessageText: string;
+  actionMessageTimer: ReturnType<typeof setTimeout> | null;
   isVolunteerModalOpen: boolean;
   filterOptions: Array<{ id: string; label: string }>;
   isFilterPanelOpen: boolean;
@@ -195,6 +206,14 @@ export interface SevaWorkspaceContext extends SevaWorkspaceState {
     createRecordPrograms?: { focus: () => void };
     createRecordQuality?: { focus: () => void };
     programEditor?: { focus: () => void };
+    queueViewButton?: HTMLButtonElement;
+    tableEditSheet?: HTMLElement;
+    tableEditName?: HTMLInputElement;
+    tableEditMobile?: HTMLInputElement;
+    tableEditQuality?: HTMLButtonElement;
+    tableEditStatus?: HTMLButtonElement;
+    tableEditFollowUp?: HTMLButtonElement;
+    tableEditPrograms?: HTMLButtonElement;
     optionSheet?: { focus: () => void };
     followUpInput?: {
       focus: () => void;
