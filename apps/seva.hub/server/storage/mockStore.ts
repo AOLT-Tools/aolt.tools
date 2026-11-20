@@ -134,7 +134,6 @@ export async function getBootstrapForUser(
         ? []
         : store.leads.filter(
             (lead) =>
-              isAssignedToUser(lead, String(user.email || '')) &&
               lead.campaignType === 'Leads' &&
               leadCampaignIds.has(String(lead.campaignId || ''))
           )
@@ -157,7 +156,6 @@ export async function getBootstrapForUser(
       ? []
       : store.leads.filter(
           (lead) =>
-            isAssignedToUser(lead, String(user.email || '')) &&
             lead.campaignId === selectedCampaign.id &&
             lead.campaignType === selectedCampaign.type
         )
@@ -175,9 +173,6 @@ export async function updateLeadForUser(
   const targetVolunteerEmail = parsed.assignedVolunteerEmail
     ? normalizeEmail(parsed.assignedVolunteerEmail)
     : undefined;
-  if (targetVolunteerEmail && !isUserAllowed(targetVolunteerEmail)) {
-    throw new Error('VOLUNTEER_NOT_ALLOWED');
-  }
   const index = store.leads.findIndex(
     (lead) => lead.id === parsed.id && lead.campaignType === parsed.campaignType
   );
@@ -186,9 +181,6 @@ export async function updateLeadForUser(
     throw new Error('Lead not found.');
   }
 
-  if (!isAssignedToUser(store.leads[index], String(user.email || ''))) {
-    throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
-  }
 
   if (parsed.mobile !== undefined) {
     if (
@@ -398,9 +390,6 @@ export async function deleteLeadForUser(
   );
   if (index < 0) {
     throw new Error('Lead not found.');
-  }
-  if (!isAssignedToUser(store.leads[index], String(user.email || ''))) {
-    throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
   }
   store.leads.splice(index, 1);
   return DeleteLeadResponseSchema.parse({

@@ -129,16 +129,6 @@ function sendCommonLeadError(
     });
   }
 
-  if (message.includes('FORBIDDEN_LEAD_ASSIGNMENT')) {
-    return sendApiError(res, error, context, {
-      status: 403,
-      code: 'FORBIDDEN',
-      message: 'You can only update records assigned to your volunteer account.',
-      retryable: false,
-      category: 'authorization_denied'
-    });
-  }
-
   if (message.includes('VOLUNTEER_NOT_ALLOWED')) {
     return sendApiError(res, error, context, {
       status: 400,

@@ -140,14 +140,6 @@ export class MockLeadRepository implements LeadRepository {
 
   async updateLead(payload: UpdateLeadRequest): Promise<UpdateLeadResponse> {
     const parsed = UpdateLeadRequestSchema.parse(payload);
-    if (
-      parsed.assignedVolunteerEmail &&
-      !(mockBootstrapData.config.allowedUsers || []).includes(
-        parsed.assignedVolunteerEmail.toLowerCase()
-      )
-    ) {
-      throw new Error('VOLUNTEER_NOT_ALLOWED');
-    }
     const index = this.leads.findIndex(
       (lead) => lead.id === parsed.id && lead.campaignType === parsed.campaignType
     );
@@ -159,13 +151,9 @@ export class MockLeadRepository implements LeadRepository {
     }
 
     if (parsed.mobile !== undefined) {
-      const target = this.leads[index];
-      if (normalizeEmail(target.assignedVolunteerEmail) !== normalizeEmail(mockBootstrapData.user.email)) {
-        throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
-      }
       if (
         parsed.campaignType === 'Leads' &&
-        parsed.mobile !== normalizeIndianMobile(target.mobile) &&
+        parsed.mobile !== normalizeIndianMobile(this.leads[index].mobile) &&
         this.leads.some(
           (lead, candidateIndex) =>
             candidateIndex !== index &&

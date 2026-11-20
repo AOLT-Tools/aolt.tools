@@ -645,7 +645,6 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     const rows = await readSheetValues('data', layout.leadsRange, operation);
     const headers = (rows[0] || []).map((value) => String(value || '').trim());
     const leadColumns = resolveLeadColumns(headers);
-    const requestedEmail = normalizeEmail(user.email);
     const leads: Lead[] = [];
 
     for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
@@ -656,12 +655,6 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       }
       const recordCampaignType = getCell(row, leadColumns.campaignType);
       if (recordCampaignType && recordCampaignType !== 'Leads') {
-        continue;
-      }
-      const assignedEmail = normalizeEmail(
-        getCell(row, leadColumns.assignedVolunteerEmail)
-      );
-      if (assignedEmail !== requestedEmail) {
         continue;
       }
       leads.push(mapRowToLead(row, leadColumns, campaign));
@@ -699,18 +692,11 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     const rows = await readSheetValues('data', range, operation);
     const headers = (rows[0] || []).map((value) => String(value || '').trim());
     const leadColumns = resolveLeadColumns(headers);
-    const requestedEmail = normalizeEmail(user.email);
     const leads: Lead[] = [];
 
     for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
       const row = rows[rowIndex] || [];
       if (!rowMatchesCampaign(row, leadColumns, selectedCampaign)) {
-        continue;
-      }
-      const assignedEmail = normalizeEmail(
-        getCell(row, leadColumns.assignedVolunteerEmail)
-      );
-      if (assignedEmail !== requestedEmail) {
         continue;
       }
       leads.push(mapRowToLead(row, leadColumns, selectedCampaign));
@@ -849,7 +835,6 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
       throw new Error('Lead sheet header must contain an id column.');
     }
 
-    const requestedEmail = normalizeEmail(user.email);
     type Candidate = { rowNumber: number; values: string[] };
     let exactMatch: Candidate | null = null;
 
@@ -868,20 +853,11 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     const assignedVolunteerEmail = normalizeEmail(
       getCell(target.values, columns.assignedVolunteerEmail)
     );
-    if (assignedVolunteerEmail !== requestedEmail) {
-      throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
-    }
 
     const targetVolunteerEmail =
       payload.assignedVolunteerEmail === undefined
         ? undefined
         : normalizeEmail(payload.assignedVolunteerEmail);
-    if (
-      targetVolunteerEmail !== undefined &&
-      !snapshot.allowedUsers.has(targetVolunteerEmail)
-    ) {
-      throw new Error('VOLUNTEER_NOT_ALLOWED');
-    }
 
     if (payload.mobile !== undefined) {
       if (columns.mobile < 0) {
@@ -1187,12 +1163,6 @@ export function createSheetsStore(dependencies: SheetsStoreDependencies = {}) {
     );
     if (rowIndex < 0) {
       throw new Error('Lead not found.');
-    }
-    if (
-      normalizeEmail(getCell(rows[rowIndex], columns.assignedVolunteerEmail)) !==
-      normalizeEmail(user.email)
-    ) {
-      throw new Error('FORBIDDEN_LEAD_ASSIGNMENT');
     }
     const rowNumber = rowIndex + 1;
     await deleteSheetRow('data', getTabName(baseRange), rowNumber, operation);

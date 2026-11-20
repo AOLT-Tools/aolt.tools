@@ -107,6 +107,7 @@ function fixture(includeCreatedAt = true, allowed = true, otherMobile?: string) 
     updateSheetValuesBatch,
     appendSheetRow,
     appendSheetRows,
+    deleteSheetRow: vi.fn(async () => {}),
     now: () => new Date(timestamp)
   });
   return {
@@ -121,6 +122,23 @@ function fixture(includeCreatedAt = true, allowed = true, otherMobile?: string) 
 afterEach(() => vi.restoreAllMocks());
 
 describe('Seva Hub storage enhancements', () => {
+  it('lets another signed-in volunteer view, edit, transfer, and delete a lead', async () => {
+    const f = fixture();
+    const actor = { ...user, email: recipient };
+    const loaded = await f.store.getBootstrapForAuthorizedUser(actor, campaignId);
+    expect(loaded).toMatchObject({ allowed: true, value: { leads: [expect.objectContaining({ id: 'leadTest01AbcDefGhIJK' })] } });
+    const update = { id: 'leadTest01AbcDefGhIJK', campaignId, campaignType: 'Leads' as const };
+    await expect(f.store.updateLeadForAuthorizedUser(actor, {
+      ...update, notes: 'Shared update', mobile: '9000000098', assignedVolunteerEmail: recipient
+    })).resolves.toMatchObject({ allowed: true });
+    expect(f.updateSheetValuesBatch.mock.calls[0][1]).toContainEqual({
+      range: 'Leads!B2', values: [['9000000098']]
+    });
+    await expect(f.store.deleteLeadForAuthorizedUser(actor, {
+      id: update.id, campaignType: 'Leads'
+    })).resolves.toMatchObject({ allowed: true });
+  });
+
   it('writes a normalized mobile correction without reusing another lead’s number', async () => {
     const f = fixture(true, true, '9000000092');
     const update = {
